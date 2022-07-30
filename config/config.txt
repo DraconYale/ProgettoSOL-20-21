@@ -1,0 +1,13 @@
+//server configuration file
+
+//Number of worker threads
+Worker Number = 
+
+//Storage Size (in Bytes)
+Storage Size = 
+
+//Max number of file that can be stored
+Storage File Number = 
+
+//Path to socket used by server
+Path To Socket = 

@@ -2,18 +2,19 @@
 Bounded buffer used to create the job queue. It's implemented as a circular queue (this may change)
 */
 
+#include <boundedBuffer.h>
+
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
 #include <errno.h>
 
-int jobNumber = 0;
-
 struct boundedBuffer{
 	size_t size;
-	char** head;
+	int jobNumber;
+	int head;							
+	int tail;
 	char** commands;						//circular queue
-	char** tail;
 	pthread_mutex_t mutex;
 	pthread_cond_t full;
 	pthread_cond t empty;
@@ -22,7 +23,7 @@ struct boundedBuffer{
 
 boundedBuffer* initBuffer(size_t size){
 	if(size <= 0){
-		errno = EINVAL;						//EINVAL 22 Argomento non valido (from 'errno -l')
+		errno = EINVAL;						//EINVAL 22 Argomento non valido (from: 'errno -l')
 		return NULL;
 	}
 	int err;
@@ -41,8 +42,10 @@ boundedBuffer* initBuffer(size_t size){
 	
 	}
 	buf->size = size;
-	buf->head = commands;
-	buf->tail = commands;
+	buf->jobNumber = 0;
+	buf->head = 0;
+	buf->tail = 0;
+	buf->commands = commands;
 	buf->mutex = mutex;
 	buf->full = full;
 	buf->empty = empty;
@@ -50,7 +53,7 @@ boundedBuffer* initBuffer(size_t size){
 }
 
 
-int enqueueBuffer(boundedBuffer* buf, char* op){
+int enqueueBuffer(boundedBuffer* buf, char* job){
 	if(buf == NULL || op == NULL){
 		errno = EINVAL;
 		return -1;
@@ -65,10 +68,10 @@ int enqueueBuffer(boundedBuffer* buf, char* op){
 	while(buf->size == jobNumber){
 		pthread_cond_wait(&(buf->full), &(buf->mutex));
 	}
-	*(buf->tail) = op;
-	jobNumber++;
-	*(buf->tail)+1;
-	if(jobNumber == (buf->size)){
+	(buf->commands[buf->head]) = job;
+	buf->head = (buf->head + 1) % buf->size;
+	buf->jobNumber = buf->jobNumber + 1;
+	if(buf->jobNumber == (buf->size)){
 		pthread_cond_broadcast(&(buf->empty));
 	}
 	if((err = (pthread_mutex_unlock(&(buf->mutex)))) != 0){
@@ -93,16 +96,24 @@ int dequeueBuffer(boundedBuffer* buf, char** retjob){
 	while(jobNumber == 0){
 		pthread_cond_wait(&(buf->empty, &(buf->mutex));
 	}
-	*retjob = *(buf->head);
-	*(buf->head)+1;
-	jobNumber--;
-	if(jobNumber == 0){
+	*retjob = (buf->commands[buf->tail]);
+	buf->tail = (buf->tail + 1) % buf->size;
+	buf->jobNumber = buf->jobNumber - 1;
+	if(buf->jobNumber == 0){
 		pthread_cond_broadcast(&(buf->full));
 	}
 	if((err = (pthread_mutex_unlock(&(buf->mutex)))) != 0){
 		perror("Couldn't unlock");
 		return -1;
 	}
+}
+
+int cleanBuffer(boundedBuffer* buf){
+	free(buf->commands);
+	pthread_mutex_destroy(&(buffer->mutex));
+	pthread_cond_destroy(&(buffer->full));
+	pthread_cond_destroy(&(buffer->empty));
+	free(buf);
 }
 
 

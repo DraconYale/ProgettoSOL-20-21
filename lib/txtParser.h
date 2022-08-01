@@ -1,5 +1,5 @@
-#ifndef BOUNDEDBUFFER_H_DEFINED
-#define BOUNDEDBUFFER_H_DEFINED
+#ifndef TXTPARSER_H_DEFINED
+#define TXTPARSER_H_DEFINED
 
 typedef struct txtFile txtFile;
 

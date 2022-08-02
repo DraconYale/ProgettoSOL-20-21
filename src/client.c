@@ -1,5 +1,7 @@
 //#include <interface.h>
 
+#include <dirent.h>
+#include <sys/types.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -49,6 +51,7 @@ int time = 0;
 int absTime = 5000;
 int setPrint = 0;
 int connected = 0;
+char* filename = NULL;
 
 int main(int argc, char** argv){
 	if(argc < 2){
@@ -119,9 +122,16 @@ int main(int argc, char** argv){
 		free(dirRead);
 		return 0;
 	}
+	if(!setDirWrite){
+		dirWrite = NULL;
+	}
+	if(!setDirRead){
+		dirRead = NULL;
+	}
 	char* socket = NULL;
 	int opt;
-	while((opt = getopt(argc, argv, "f:w::W:r:R::l:u:c:p")) != -1){
+	int err;
+	while((opt = getopt(argc, argv, "f:w:W:r:R::l:u:c:")) != -1){
 		switch(opt){
 		    case 'f' :
 		    	socket = optarg;
@@ -132,35 +142,120 @@ int main(int argc, char** argv){
 		       	connected = 1;
 		        break;
 		    case 'w' :
+		    	if(connected){
+		    		//tokenize optarg
+		    		DIR* directorySend;
+		    		DIR* directoryMiss;
+		    		char* dir = NULL;
+		    		char* nString = NULL;
+		    		int n = 0;
+		    		char* strtokState = NULL;
+		    		char* token = strtok_r(optarg, ",", &strtokState);
+		    		if(token != NULL){
+		    			dir = token;
+		    		}
+		    		else{
+		    			errno = EINVAL;
+		    			perror("-w dirname");
+		    			break;
+		    		}
+		    		token = strtok_r(NULL, " ", &strtokState);
+		    		if(token != NULL){
+		    			if(strncmp(token, "n=", 2){
+		    				if(nString = strrchr(token, '=') != NULL){
+		    					if((n = (isNumber(nString+1))) != -1){
+		    						continue;
+		    					}
+		    					else{
+		    						errno = EINVAL;
+		    						perror("n value in -w");
+		    						break;
+		    					}
+		    				}
+		    				else{
+		    					errno = EINVAL;
+		    					perror("-w n");
+		    					break;
+		    				}
+		    			}
+		    			else{
+		    				errno = EINVAL;
+		    				perror("n argument in -w");
+		    			}
+		    		}
+		    		//TODO
+		    		if((directorySend = opendir("./send")) == NULL){
+		    			perror("-w opening send directory");
+		    			break;
+		    		}
+		    		if(n == 0){
+		    			
+		    			while((err = writeFile(,dirWrite)) != -1){
+		    					
+		    			}
+		    			break;
+		    		}
+		    		else{
+		    			while(n>0){
+		    				
+		    				if((err = writeFile(,dirWrite)) != -1){
+		    					perror("-w write");
+		    					break;
+		    				}
+		    				n--;
+		    			}
+		    			
+		    			break;
+		    		}
+		    		
 		    	
-		    	
-		    	if(!setDirWrite){
-		    		errno = ENOENT;
-		    		perror("On -w:");
-		    		return -1;            	
 		    	}
+		    	else{
+		    		errno = ENOTCONN; 	//ENOTCONN 107 Il socket di destinazione non è connesso (from "errno -l")
+				perror("-w");
+		    		break;
+		    	}
+		    	
+		    	
 		        
 		    case 'W' :
-		    	if(!setDirWrite){
-		    		errno = ENOENT;
-		    		perror("On -W:");
-		    		return -1;            	
+		    	if(connected){
+		    		//tokenize optarg
+		    		
+		    		if(setDirWrite){
+		    		           	
+		    		}
+		    	
 		    	}
-		    
-		    case 'D' :
-		        
+		    	else{
+		    		errno = ENOTCONN; 	//ENOTCONN 107 Il socket di destinazione non è connesso (from "errno -l")
+				perror("-W");
+		    		break;
+		    	}
 		    case 'r' :
-		    	if(!setDirRead){
-		    		errno = ENOENT;
-		    		perror("On -r:");
-		    		return -1;            	
+		    	if(connected){
+		    		if(setDirRead){
+		    		           	
+		    		}
+		    	
+		    	}
+		    	else{
+		    		errno = ENOTCONN; 	//ENOTCONN 107 Il socket di destinazione non è connesso (from "errno -l")
+				perror("-r");
+		    		break;
 		    	}
 		        
 		    case 'R' :
-		    	if(!setDirRead){
-		    		errno = ENOENT;
-		    		perror("On -R:");
-		    		return -1;            	
+		    	if(connected){
+		    		if(setDirWrite){
+		    		           	
+		    		}
+		    	
+		    	}
+		    	else{
+		    		errno = ENOTCONN; 	//ENOTCONN 107 Il socket di destinazione non è connesso (from "errno -l")
+				perror("-R");
+		    		break;
 		    	}
 		   
 	
@@ -169,11 +264,7 @@ int main(int argc, char** argv){
 		    case 'u' :
 		    
 		    case 'c' :
-		    
-		    case 'p' :
-		        
-                
-                
+		      
         	}
    	 }
 	return 0;

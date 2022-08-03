@@ -204,10 +204,8 @@ int main(int argc, char** argv){
 		    				}
 		    				n--;
 		    			}
-		    			
-		    			break;
 		    		}
-		    		
+		    		break;
 		    	
 		    	}
 		    	else{
@@ -236,20 +234,21 @@ int main(int argc, char** argv){
 		    			filesNumber++;
 		    			token = strtok_r(NULL, ",", &strtokState);
 		    		}
-		    		int f = 0;						//index used for pointing the files
-		    		while(f<filesNumber){
-		    			if((err = writeFile(files[f],dirWrite)) != -1){
-		    					perror("-w write");
+		    		int w = 0;						//index used for pointing the files
+		    		while(w<filesNumber){
+		    			if((err = writeFile(files[w],dirWrite)) != -1){
+		    					perror("-W write");
 		    					break;
 		    			}
 		    			f++;
 		    		}
+		    		break;
 		    		
 		    	
 		    	}
 		    	else{
 		    		errno = ENOTCONN; 	//ENOTCONN 107 Il socket di destinazione non è connesso (from "errno -l")
-				perror("-w");
+				perror("-W");
 		    		break;
 		    	}
 		    	
@@ -257,9 +256,32 @@ int main(int argc, char** argv){
 		        
 		    case 'r' :
 		    	if(connected){
-		    		if(setDirRead){
-		    		           	
+		    		//tokenize optarg
+		    		char** files = calloc(MAXLEN, sizeof(char*));
+		 		int filesNumber = 0;
+		    		char* strtokState = NULL;
+		    		char* token = strtok_r(optarg, ",", &strtokState);
+		    		if(token == NULL){
+		    			errno = EINVAL;
+		    			perror("-r filename");
+		    			break;
+		    		
 		    		}
+		    		while(token != NULL){
+		    			files[filesNumber] = token;
+		    			filesNumber++;
+		    			token = strtok_r(NULL, ",", &strtokState);
+		    		}
+		    		int r = 0;						//index used for pointing the files
+		    		while(r<filesNumber){
+		    			if((err = readFile(files[r],dirRead)) != -1){
+		    					perror("-r read");
+		    					break;
+		    			}
+		    			r++;
+		    		}
+		    		break;
+		    		
 		    	
 		    	}
 		    	else{
@@ -267,6 +289,7 @@ int main(int argc, char** argv){
 				perror("-r");
 		    		break;
 		    	}
+		    	
 		        
 		    case 'R' :
 		    	if(connected){

@@ -143,8 +143,15 @@ int main(int argc, char** argv){
 			       		return -1;
 			       	}
 			       	connected = 1;
+			       	break;
 		       	}
-		        break;
+		       	else{
+		       		errno = EISCONN;		//EISCONN 106 Il socket di destinazione è già connesso (from "errno -l")
+		       		perror("-f");
+		       		break;
+		       	}
+		        
+		        
 		    case 'w' :
 		    	if(connected){
 		    		//tokenize optarg
@@ -194,7 +201,7 @@ int main(int argc, char** argv){
 		    		}
 		    		if(n == 0){
 		    			
-		    			while((err = writeFile(,dirWrite)) != -1){
+		    			while((err = writeFile(,dirWrite)) != 0){
 		    					
 		    			}
 		    			break;
@@ -202,7 +209,7 @@ int main(int argc, char** argv){
 		    		else{
 		    			while(n>0){
 		    				
-		    				if((err = writeFile(,dirWrite)) != -1){
+		    				if((err = writeFile(,dirWrite)) != 0){
 		    					perror("-w write");
 		    					break;
 		    				}
@@ -240,10 +247,13 @@ int main(int argc, char** argv){
 		    		}
 		    		int w = 0;						//index used for pointing the files
 		    		while(w<filesNumber){
-		    			if((err = writeFile(files[w],dirWrite)) != -1){
+		    			if((err = openFile(files[w])) != 0){
+		    				perror("-W opening file");
+		    			}
+		    			if((err = writeFile(files[w],dirWrite)) != 0){
 		    					perror("-W write");
 		    			}
-		    			f++;
+		    			w++;
 		    		}
 		    		free(files);
 		    		break;
@@ -272,7 +282,10 @@ int main(int argc, char** argv){
 		    		}
 		    		int r = 0;						//index used for pointing the files
 		    		while(r<filesNumber){
-		    			if((err = readFile(files[r],dirRead)) != -1){
+		    			if((err = openFile(files[r])) != 0){
+		    				perror("-r opening file");
+		    			}
+		    			if((err = readFile(files[r],dirRead)) != 0){
 		    					perror("-r read");
 		    					break;
 		    			}
@@ -292,7 +305,6 @@ int main(int argc, char** argv){
 		        
 		    case 'R' :
 		    	if(connected){
-		    		
 		    	
 		    	}
 		    	else{
@@ -316,7 +328,10 @@ int main(int argc, char** argv){
 		    		}
 		    		int l = 0;						//index used for pointing the files
 		    		while(l<filesNumber){
-		    			if((err = lockFile(files[l])) != -1){
+		    			if((err = openFile(files[l])) != 0){
+		    				perror("-l opening file");
+		    			}
+		    			if((err = lockFile(files[l])) != 0){
 		    					perror("-l lock");
 		    			}
 		    			l++;
@@ -346,8 +361,11 @@ int main(int argc, char** argv){
 		    		}
 		    		int u = 0;						//index used for pointing the files
 		    		while(u<filesNumber){
-		    			if((err = unlockFile(files[u])) != -1){
-		    					perror("-u lock");
+		    			if((err = openFile(files[u])) != 0){
+		    				perror("-u opening file");
+		    			}
+		    			if((err = unlockFile(files[u])) != 0){
+		    					perror("-u unlock");
 		    			}
 		    			u++;
 		    		}
@@ -363,7 +381,28 @@ int main(int argc, char** argv){
 		    	
 		    case 'c' :
 		    	if(connected){
-		    		
+		    		//tokenize optarg
+		    		char** files = calloc(MAXLEN, sizeof(char*));
+		 		int filesNumber = 0;
+		    		char* strtokState = NULL;
+		    		char* token = strtok_r(optarg, ",", &strtokState);
+		    		while(token != NULL){
+		    			files[filesNumber] = token;
+		    			filesNumber++;
+		    			token = strtok_r(NULL, ",", &strtokState);
+		    		}
+		    		int c = 0;						//index used for pointing the files
+		    		while(c<filesNumber){
+		    			if((err = openFile(files[c])) != 0){
+		    				perror("-c opening file");
+		    			}
+		    			if((err = removeFile(files[c])) != 0){
+		    					perror("-c remove");
+		    			}
+		    			c++;
+		    		}
+		    		free(files);
+		    		break;
 		    	
 		    	}
 		    	else{

@@ -305,13 +305,47 @@ int main(int argc, char** argv){
 		        
 		    case 'R' :
 		    	if(connected){
-		    	
+		    		int n = 0;
+		    		if(optarg == 0){
+		    			if(err = (readNFiles(0,dirRead)) != 0){
+		    				perror("-R read");
+		    			}
+		    		}
+		    		else{   	
+		    			char* nString = NULL;		
+		    			if(strncmp(optarg, "n=", 2){
+		    				if(nString = strrchr(optarg, '=') != NULL){
+		    					if((n = (isNumber(nString+1))) != -1){
+		    						if(err = (readNFiles(n,dirRead)) != 0){
+		    							perror("-R read");
+		    						}
+		    					}
+		    					else{
+		    						errno = EINVAL;
+		    						perror("n value in -R");
+		    						break;
+		    					}
+		    				}
+		    				else{
+		    					errno = EINVAL;
+		    					perror("-R n");
+		    					break;
+		    				}
+		    			}
+		    			else{
+		    				errno = EINVAL;
+		    				perror("n argument in -R");
+		    			}
+		    		
+		    		}
+		    		break;
 		    	}
 		    	else{
 		    		errno = ENOTCONN; 	//ENOTCONN 107 Il socket di destinazione non è connesso (from "errno -l")
 				perror("-R");
 		    		break;
 		    	}
+		    	
 		   
 	
 		    case 'l' :

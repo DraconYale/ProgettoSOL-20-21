@@ -334,7 +334,25 @@ int main(int argc, char** argv){
 		    	
 		    case 'u' :
 		    	if(connected){
-		    		
+		    		//tokenize optarg
+		    		char** files = calloc(MAXLEN, sizeof(char*));
+		 		int filesNumber = 0;
+		    		char* strtokState = NULL;
+		    		char* token = strtok_r(optarg, ",", &strtokState);
+		    		while(token != NULL){
+		    			files[filesNumber] = token;
+		    			filesNumber++;
+		    			token = strtok_r(NULL, ",", &strtokState);
+		    		}
+		    		int u = 0;						//index used for pointing the files
+		    		while(u<filesNumber){
+		    			if((err = unlockFile(files[u])) != -1){
+		    					perror("-u lock");
+		    			}
+		    			u++;
+		    		}
+		    		free(files);
+		    		break;
 		    	
 		    	}
 		    	else{

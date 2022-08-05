@@ -111,7 +111,9 @@ int main(int argc, char** argv){
 				}
 			}
 			if((strncmp(tmp, "-p", 2)) == 0){
-				setPrint = 1;
+				if(!setPrint){
+					setPrint = 1;
+				}
 			}
 		}
 		i++;
@@ -134,12 +136,14 @@ int main(int argc, char** argv){
 	while((opt = getopt(argc, argv, "f:w:W:r:R::l:u:c:")) != -1){
 		switch(opt){
 		    case 'f' :
-		    	socket = optarg;
-		       	if(openConnection(socket, time, absTime) != 0){
-		       		perror("-f");
-		       		return -1;
+		    	if(!connected){
+			    	socket = optarg;
+			       	if(openConnection(socket, time, absTime) != 0){
+			       		perror("-f");
+			       		return -1;
+			       	}
+			       	connected = 1;
 		       	}
-		       	connected = 1;
 		        break;
 		    case 'w' :
 		    	if(connected){
@@ -238,10 +242,10 @@ int main(int argc, char** argv){
 		    		while(w<filesNumber){
 		    			if((err = writeFile(files[w],dirWrite)) != -1){
 		    					perror("-W write");
-		    					break;
 		    			}
 		    			f++;
 		    		}
+		    		free(files);
 		    		break;
 		    		
 		    	
@@ -261,12 +265,6 @@ int main(int argc, char** argv){
 		 		int filesNumber = 0;
 		    		char* strtokState = NULL;
 		    		char* token = strtok_r(optarg, ",", &strtokState);
-		    		if(token == NULL){
-		    			errno = EINVAL;
-		    			perror("-r filename");
-		    			break;
-		    		
-		    		}
 		    		while(token != NULL){
 		    			files[filesNumber] = token;
 		    			filesNumber++;
@@ -280,6 +278,7 @@ int main(int argc, char** argv){
 		    			}
 		    			r++;
 		    		}
+		    		free(files);
 		    		break;
 		    		
 		    	
@@ -293,9 +292,7 @@ int main(int argc, char** argv){
 		        
 		    case 'R' :
 		    	if(connected){
-		    		if(setDirWrite){
-		    		           	
-		    		}
+		    		
 		    	
 		    	}
 		    	else{
@@ -306,11 +303,56 @@ int main(int argc, char** argv){
 		   
 	
 		    case 'l' :
-		    
+		    	if(connected){
+		    		//tokenize optarg
+		    		char** files = calloc(MAXLEN, sizeof(char*));
+		 		int filesNumber = 0;
+		    		char* strtokState = NULL;
+		    		char* token = strtok_r(optarg, ",", &strtokState);
+		    		while(token != NULL){
+		    			files[filesNumber] = token;
+		    			filesNumber++;
+		    			token = strtok_r(NULL, ",", &strtokState);
+		    		}
+		    		int l = 0;						//index used for pointing the files
+		    		while(l<filesNumber){
+		    			if((err = lockFile(files[l])) != -1){
+		    					perror("-l lock");
+		    			}
+		    			l++;
+		    		}
+		    		free(files);
+		    		break;
+		    		
+		    	
+		    	}
+		    	else{
+		    		errno = ENOTCONN; 	//ENOTCONN 107 Il socket di destinazione non è connesso (from "errno -l")
+				perror("-l");
+		    		break;
+		    	}
+		    	
 		    case 'u' :
-		    
+		    	if(connected){
+		    		
+		    	
+		    	}
+		    	else{
+		    		errno = ENOTCONN; 	//ENOTCONN 107 Il socket di destinazione non è connesso (from "errno -l")
+				perror("-u");
+		    		break;
+		    	}
+		    	
 		    case 'c' :
-		      
+		    	if(connected){
+		    		
+		    	
+		    	}
+		    	else{
+		    		errno = ENOTCONN; 	//ENOTCONN 107 Il socket di destinazione non è connesso (from "errno -l")
+				perror("-c");
+		    		break;
+		    	}
         	}
    	 }
 	return 0;

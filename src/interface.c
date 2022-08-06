@@ -12,14 +12,14 @@
 #define MAXLEN 256
 #define UNIX_PATH_MAX 108
 
+int csfd;				//client socket file descriptor
+char* cSockname= calloc(UNIX_PATH_MAX, sizeof(char));
 /*
 openConnection: opens an AF_UNIX connection to socket 'sockname'. If the connection is not accepted immediately, the client connection is
 		repeated after 'msec' milliseconds. After 'abstime' connection attempts are not possible anymore.
 		Returns (0) if success, (-1) if failure and sets errno.
 */
 int openConnection(const char* sockname, int msec, const struct timespec abstime){
-	int err;
-	int csfd;
 	if(sockname == NULL || strlen(sockname) > UNIX_PATH_MAX || msec < 0){
 		errno = EINVAL;
 		return -1;
@@ -32,7 +32,6 @@ int openConnection(const char* sockname, int msec, const struct timespec abstime
 	sock_addr.sun_family = AF_UNIX;
 	while((connect(csfd, &sock_addr, sizeof(sock_addr))) == -1){
 		if (errno != ENOENT){					//ENOENT 2 File o directory non esistente
-			err = errno;
 			return -1;
 		}
 		time_t current = time(NULL);				//current time
@@ -43,6 +42,7 @@ int openConnection(const char* sockname, int msec, const struct timespec abstime
 		sleep(msec); 
 		errno = 0;
 	}
+	strncpy(cSockname, sockname, UNIX_PATH_MAX);
 	return 0;
 }
 
@@ -52,7 +52,14 @@ closeConnection: closes the AF_UNIX connection to socket 'sockname'.
 		 Returns (0) if success, (-1) if failure and sets errno.
 */
 int closeConnection(const char* sockname){
-	//TODO
+	if (sockname == NULL || strlen(sockname) > UNIX_PATH_MAX || strncmp(sockname, cSockname, UNIX_PATH_MAX) != 0){
+		err = EINVAL;
+		return -1;
+	}
+	if (close(csfd) != 0){
+		return -1;
+	}
+	return 0;
 }
 
 

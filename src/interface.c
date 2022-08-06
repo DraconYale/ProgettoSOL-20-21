@@ -1,8 +1,16 @@
+#include <interface.h>
+
 #include <stdio.h>
 #include <stlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <errno.h>
+#include <sys/socket.h>
+#include <sys/time.h>
+#include <sys/types.h>
 
+#define MAXLEN 256
+#define UNIX_PATH_MAX 108
 
 /*
 openConnection: opens an AF_UNIX connection to socket 'sockname'. If the connection is not accepted immediately, the client connection is
@@ -10,7 +18,32 @@ openConnection: opens an AF_UNIX connection to socket 'sockname'. If the connect
 		Returns (0) if success, (-1) if failure and sets errno.
 */
 int openConnection(const char* sockname, int msec, const struct timespec abstime){
-	//TODO
+	int err;
+	int csfd;
+	if(sockname == NULL || strlen(sockname) > UNIX_PATH_MAX || msec < 0){
+		errno = EINVAL;
+		return -1;
+	}
+	if((csfd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1){
+		return -1;
+	}
+	struct sockaddr_un sock_addr;
+	strncpy(sock_addr.sun_path, sockname, strlen(sockname) + 1);
+	sock_addr.sun_family = AF_UNIX;
+	while((connect(csfd, &sock_addr, sizeof(sock_addr))) == -1){
+		if (errno != ENOENT){					//ENOENT 2 File o directory non esistente
+			err = errno;
+			return -1;
+		}
+		time_t current = time(NULL);				//current time
+		if (current > abstime.tv_sec){		
+			err = EAGAIN;					//EAGAIN 11 Risorsa temporaneamente non disponibile		
+			return -1;
+		}
+		sleep(msec); 
+		errno = 0;
+	}
+	return 0;
 }
 
 

@@ -57,7 +57,7 @@ int applyConfig(txtFile* conf, const char* pathToConfig){
 			//strtol may set errno for underflow or overflow!
 			if(errno == ERANGE){
 				cleanconf(config);
-				errno = EINVAL;								//value not valid, sets errno = EINVAL
+				errno = EINVAL;								//invalid value, sets errno = EINVAL
 				return -1;
 			}
 			else{
@@ -70,7 +70,7 @@ int applyConfig(txtFile* conf, const char* pathToConfig){
 			//strtol may set errno for underflow or overflow!
 			if(errno == ERANGE){
 				cleanconf(config);
-				errno = EINVAL;								//value not valid, sets errno = EINVAL
+				errno = EINVAL;								//invalid value, sets errno = EINVAL
 				return -1;
 			}
 			else{
@@ -83,7 +83,7 @@ int applyConfig(txtFile* conf, const char* pathToConfig){
 			//strtol may set errno for underflow or overflow!
 			if(errno == ERANGE){
 				cleanconf(config);
-				errno = EINVAL;								//value not valid, sets errno = EINVAL
+				errno = EINVAL;								//invalid value, sets errno = EINVAL
 				return -1;
 			}
 			else{
@@ -92,7 +92,7 @@ int applyConfig(txtFile* conf, const char* pathToConfig){
 			}
 		}
 		if(strncmp(buf, SOCKET, strlen(SOCKET)) == 0){
-			strncpy(conf->pathToSocket, buf+strlen(SOCKET), MAX_SOCKET_LENGHT); 		//strtol of value, base 10
+			strncpy(conf->pathToSocket, buf+strlen(SOCKET), MAX_SOCKET_LENGHT); 		
 			break;
 		}
 	}

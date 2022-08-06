@@ -1,4 +1,4 @@
-//#include <interface.h>
+#include <interface.h>
 
 #include <dirent.h>
 #include <sys/types.h>
@@ -100,7 +100,7 @@ int main(int argc, char** argv){
 			}
 			if((strncmp(tmp, "-t", 2)) == 0){
 				if((tmpTime = isNumber(argv[i+1])) != -1){
-					time = tmpTime;
+					time = tmpTime/1000;			//convert to milliseconds
 				}
 				else{
 					errno = EINVAL;

@@ -10,6 +10,10 @@
 
 #define BUFFERSIZE 1024
 #define MAXLEN 256
+#define UNIX_PATH_MAX 108
+
+#define O_CREATE 1
+#define O_LOCK 2
 
 #define HELP \
 "Usage: ./client -f <filename> [OPTIONS]\n"\
@@ -46,12 +50,74 @@ int validator(char* str){
 
 int setHelp = 0;
 int setDirWrite = 0;
+int nWrite = 0;
 int setDirRead = 0;
 int time = 0;
 int absTime = 5000;
 int setPrint = 0;
 int connected = 0;
 char* filename = NULL;
+
+//function used to visit recursively directories and send to server the files stored in them
+int writeRecDir(char* dirname, char* dirMiss) {
+	if(dirname == NULL){
+		return -1;
+	}
+        
+	DIR * dir;
+
+	if ((dir=opendir(dirname)) == NULL) {
+		perror("opendir");
+		return -1;
+	} 
+	else {
+		struct dirent *elem;
+
+		while((errno=0, elem =readdir(dir)) != NULL && nWrite != 0) {
+			int parentL = strlen(nomedir);
+			int elemL = strlen(file->d_name);
+			if ((parentL+elemL+2)>MAX_PATH) {
+				errno = ENAMETOOLONG;	//ENAMETOOLONG 36 Nome del file troppo lungo (from "errno -l")
+				perror("readdir");
+				return -1;
+			}
+				
+			char file[UNIX_PATH_MAX];
+			strncpy(file,dirname,UNIX_MAX_PATH-1);
+				
+			if(dirname[strlen(dirname)-1] != '/'){
+				strncat(file,"/",UNIX_MAX_PATH-1)
+			}
+			strncat(file,file->d_name, UNIX_MAX_PATH-1);
+				
+			if(elem->d_type == DT_DIR && strcmp(elem->d_name, ".") != 0  && strcmp(elem->d_name, "..") != 0) {
+				writeRecDir(file, dirMiss);
+			} 
+			else{
+				if (openFile(file, O_LOCK | O_CREATE) != 0){
+					perror("-w openFile");
+					return -1;
+				}
+			
+				if(writeFile(file, dirMiss) != 0){
+					perror("-w writeFile");
+					return -1;
+				}
+				if(closeFile(file) != 0){
+					perror("-w closeFile");
+					return -1;
+				}
+				nWrite--;
+				sleep(time);
+			}
+		}
+		if (errno != 0){
+			perror("readdir");
+		}
+		closedir(dir);
+    	}
+	return 0;
+}
 
 int main(int argc, char** argv){
 	if(argc < 2){
@@ -175,7 +241,7 @@ int main(int argc, char** argv){
 		    		if(token != NULL){
 		    			if(strncmp(token, "n=", 2){
 		    				if(nString = strrchr(token, '=') != NULL){
-		    					if((n = (isNumber(nString+1))) != -1){
+		    					if((nWrite = (isNumber(nString+1))) != -1){
 		    						continue;
 		    					}
 		    					else{
@@ -195,27 +261,11 @@ int main(int argc, char** argv){
 		    				perror("n argument in -w");
 		    			}
 		    		}
-		    		//TODO
-		    		if((directorySend = opendir("./send")) == NULL){
-		    			perror("-w opening send directory");
-		    			break;
+		    		if(nWrite == 0){
+		    			nWrite = -1;
 		    		}
-		    		if(n == 0){
-		    			
-		    			while((err = writeFile(,dirWrite)) != 0){
-		    					
-		    			}
-		    			break;
-		    		}
-		    		else{
-		    			while(n>0){
-		    				
-		    				if((err = writeFile(,dirWrite)) != 0){
-		    					perror("-w write");
-		    					break;
-		    				}
-		    				n--;
-		    			}
+		    		if(writeRecDir(dir, dirWrite) != 0){
+		    			return -1;
 		    		}
 		    		sleep(time);
 		    		break;
@@ -249,7 +299,7 @@ int main(int argc, char** argv){
 		    		}
 		    		int w = 0;						//index used for pointing the files
 		    		while(w<filesNumber){
-		    			if((err = openFile(files[w])) != 0){
+		    			if((err = openFile(files[w], O_LOCK | O_CREATE)) != 0){
 		    				perror("-W opening file");
 		    			}
 		    			if((err = writeFile(files[w],dirWrite)) != 0){
@@ -285,7 +335,7 @@ int main(int argc, char** argv){
 		    		}
 		    		int r = 0;						//index used for pointing the files
 		    		while(r<filesNumber){
-		    			if((err = openFile(files[r])) != 0){
+		    			if((err = openFile(files[r], O_LOCK | O_CREATE)) != 0){
 		    				perror("-r opening file");
 		    			}
 		    			if((err = readFile(files[r],dirRead)) != 0){
@@ -368,7 +418,7 @@ int main(int argc, char** argv){
 		    		}
 		    		int l = 0;						//index used for pointing the files
 		    		while(l<filesNumber){
-		    			if((err = openFile(files[l])) != 0){
+		    			if((err = openFile(files[l]), O_LOCK | O_CREATE) != 0){
 		    				perror("-l opening file");
 		    			}
 		    			if((err = lockFile(files[l])) != 0){
@@ -402,7 +452,7 @@ int main(int argc, char** argv){
 		    		}
 		    		int u = 0;						//index used for pointing the files
 		    		while(u<filesNumber){
-		    			if((err = openFile(files[u])) != 0){
+		    			if((err = openFile(files[u]), O_LOCK | O_CREATE) != 0){
 		    				perror("-u opening file");
 		    			}
 		    			if((err = unlockFile(files[u])) != 0){
@@ -435,7 +485,7 @@ int main(int argc, char** argv){
 		    		}
 		    		int c = 0;						//index used for pointing the files
 		    		while(c<filesNumber){
-		    			if((err = openFile(files[c])) != 0){
+		    			if((err = openFile(files[c]), O_LOCK | O_CREATE) != 0){
 		    				perror("-c opening file");
 		    			}
 		    			if((err = removeFile(files[c])) != 0){

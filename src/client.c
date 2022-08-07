@@ -143,6 +143,7 @@ int main(int argc, char** argv){
 			       		return -1;
 			       	}
 			       	connected = 1;
+			       	sleep(time);
 			       	break;
 		       	}
 		       	else{
@@ -216,6 +217,7 @@ int main(int argc, char** argv){
 		    				n--;
 		    			}
 		    		}
+		    		sleep(time);
 		    		break;
 		    	
 		    	}
@@ -256,6 +258,7 @@ int main(int argc, char** argv){
 		    			w++;
 		    		}
 		    		free(files);
+		    		sleep(time);
 		    		break;
 		    		
 		    	
@@ -292,6 +295,7 @@ int main(int argc, char** argv){
 		    			r++;
 		    		}
 		    		free(files);
+		    		sleep(time);
 		    		break;
 		    		
 		    	
@@ -338,7 +342,9 @@ int main(int argc, char** argv){
 		    			}
 		    		
 		    		}
+		    		sleep(time);
 		    		break;
+		    		
 		    	}
 		    	else{
 		    		errno = ENOTCONN; 	//ENOTCONN 107 Il socket di destinazione non è connesso (from "errno -l")
@@ -371,6 +377,7 @@ int main(int argc, char** argv){
 		    			l++;
 		    		}
 		    		free(files);
+		    		sleep(time);
 		    		break;
 		    		
 		    	
@@ -404,6 +411,7 @@ int main(int argc, char** argv){
 		    			u++;
 		    		}
 		    		free(files);
+		    		sleep(time);
 		    		break;
 		    	
 		    	}
@@ -436,6 +444,7 @@ int main(int argc, char** argv){
 		    			c++;
 		    		}
 		    		free(files);
+		    		sleep(time);
 		    		break;
 		    	
 		    	}

@@ -1,5 +1,3 @@
-#include <interface.h>
-
 #include <stdio.h>
 #include <stlib.h>
 #include <string.h>
@@ -9,11 +7,14 @@
 #include <sys/time.h>
 #include <sys/types.h>
 
+#include <interface.h>
+#include <functions.h>
+
 #define MAXLEN 256
 #define UNIX_PATH_MAX 108
 
-int csfd;				//client socket file descriptor
-char* cSockname= calloc(UNIX_PATH_MAX, sizeof(char));
+int csfd;							//client socket file descriptor
+char* cSockname = calloc(UNIX_PATH_MAX, sizeof(char));
 /*
 openConnection: opens an AF_UNIX connection to socket 'sockname'. If the connection is not accepted immediately, the client connection is
 		repeated after 'msec' milliseconds. After 'abstime' connection attempts are not possible anymore.
@@ -68,7 +69,25 @@ openFile: open or creation request for file 'pathname'. Possible 'flags' are O_C
 	  Returns (0) if success, (-1) if failure and sets errno.
 */
 int openFile(const char* pathname, int flags){
+	if (pathname == NULL || strlen(pathname) > UNIX_PATH_MAX){
+		err = EINVAL;
+		return -1;
+	}
+	char* tmpbuf = calloc(MAXLEN, sizeof(char));
+	//request will be parsed by server
+	snprintf(tmpbuf, MAXLEN, "%s %s %d", OPEN, pathname, flags);
+	if(write(csfd, (void *)tmpbuf, MAXLEN) == -1){
+		return -1;
+	}
+	char ret;
+	if(read(csfd, (void*)ret, 1) == -1){
+		return -1;
+	}
+	int retCode = (int) ret;
 	//TODO
+	//error handling
+	return 0;
+	
 }
 
 
@@ -77,7 +96,25 @@ readFile: reads all the contents in file 'pathname' and returns a pointer to hea
 	  Returns (0) if success, (-1) if failure (i.e. 'pathname' doesn't exist) and sets errno.
 */
 int readFile(const char* pathname, void** buf, size_t* size){
+	if(pathname == NULL || buf == NULL || size > MAXLEN){
+		errno = EINVAL;
+		return -1;
+	}
+	char* tmpbuf = calloc(MAXLEN, sizeof(char));
+	//request will be parsed by server
+	snprintf(tmpbuf, MAXLEN, "%s %s %d", READ, buf, size);
+	if(writen(csfd, (void *)tmpbuf, MAXLEN) == -1){
+		return -1;
+	}
+	char ret;
+	if(readn(csfd, (void*)ret, 1) == -1){
+		return -1;
+	}
+	int retCode = (int) ret;
 	//TODO
+	//error handling
+	//return in buf
+	return 0;
 }
 
 
@@ -86,7 +123,25 @@ readNFiles: client request for N files. If server file count is <N or N<=0 then 
 	    Returns (0) if success, (-1) if failure and sets errno.
 */
 int readNFiles(int N, const char* dirname){
+	if(dirname == NULL || strlen(dirname) > UNIX_MAX_PATH){
+		errno = EINVAL;
+		return -1;
+	}
+	char* tmpbuf = calloc(MAXLEN, sizeof(char));
+	//request will be parsed by server
+	snprintf(tmpbuf, MAXLEN, "%s %d", READN, N);
+	if(write(csfd, (void *)tmpbuf, MAXLEN) == -1){
+		return -1;
+	}
+	char ret;
+	if(read(csfd, (void*)ret, 1) == -1){
+		return -1;
+	}
+	int retCode = (int) ret;
 	//TODO
+	//error handling
+	//write in dirname
+	return 0;
 }
 
 

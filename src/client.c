@@ -1,5 +1,3 @@
-#include <interface.h>
-
 #include <dirent.h>
 #include <sys/types.h>
 #include <stdio.h>
@@ -7,6 +5,9 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+
+#include <interface.h>
+#include <functions.h>
 
 #define BUFFERSIZE 1024
 #define MAXLEN 256
@@ -88,7 +89,7 @@ int writeRecDir(char* dirname, char* dirMiss) {
 			if(dirname[strlen(dirname)-1] != '/'){
 				strncat(file,"/",UNIX_MAX_PATH-1)
 			}
-			strncat(file,file->d_name, UNIX_MAX_PATH-1);
+			strncat(file,elem->d_name, UNIX_MAX_PATH-1);
 				
 			if(elem->d_type == DT_DIR && strcmp(elem->d_name, ".") != 0  && strcmp(elem->d_name, "..") != 0) {
 				writeRecDir(file, dirMiss);
@@ -338,9 +339,27 @@ int main(int argc, char** argv){
 		    			if((err = openFile(files[r], O_LOCK | O_CREATE)) != 0){
 		    				perror("-r opening file");
 		    			}
-		    			if((err = readFile(files[r],dirRead)) != 0){
-		    					perror("-r read");
+		    			char* ansBuf = NULL
+		    			size_t readSize = 0;
+		    			if((err = readFile(files[r],ansBuf,readSize)) != 0){
+		    					perror("-r read file");
 		    					break;
+		    			}
+		    			if(dirRead != NULL){
+		    				char file[UNIX_PATH_MAX];
+						strncpy(file,dirRead,UNIX_MAX_PATH-1);
+						strncat(file,files[r], UNIX_MAX_PATH-1);
+						FILE* dest;
+						if((dest = fopen(file, w)) == NULL){
+							perror("-r opening dest file");
+							free(files);
+							break;
+						}
+						if(fwrite(ansBuf, readSize, 1, dest) != 1){
+							perror("-r writing in dest file");
+							free(files);
+							break;
+						}
 		    			}
 		    			r++;
 		    		}

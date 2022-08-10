@@ -134,4 +134,14 @@ int writeUnlock(locker* lock){
 	return 0;
 }
 
+int freeLock(locker* lock){
+	if(lock == NULL){
+		return 0;
+	}
+	pthread_mutex_destroy(&(lock->mux));
+	pthread_cond_destroy(&(lock->cond));
+	free(lock);
+
+}
+
 

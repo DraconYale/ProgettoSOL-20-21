@@ -50,7 +50,7 @@ hashTable* hashTableInit(int maxFiles){
 
 
 int hashInsert(hashTable* table, char* key, void* content){
-	if(table == NULL || key == NULL || content == NULL){
+	if(table == NULL || key == NULL){
 		errno = EINVAL;
 		return -1;
 	}
@@ -62,16 +62,47 @@ int hashInsert(hashTable* table, char* key, void* content){
 	hashItem* current = table->items[tmpHash];
 	while(current != NULL){
 		if(strcmp(current->key, key) == 0){
+			current->content = content;			//updates item if exists
 			free(newItem);
-			return -1;
+			return 0;
 		}
 		current = current->next;
 	}
 	newItem->next = table->items[tmpHash];
 	table->items[tmpHash] = newItem;
+	table->entriesNumber++;
 	return 0;
 
 }
 
+int hashRemove(hashTable* table, char* key){
+	if(table == NULL || key == NULL){
+		errno = EINVAL;
+		return -1;
+	}
+	int tmpHash = hashFunc(key) % table->tableSize;
+	hashItem* current = table->items[tmpHash];
+	hashItem* prev = NULL;
+	while(current != NULL){
+		if(strcmp(current->key, key) == 0){
+			if(prev == NULL){
+				table->items[tmpHash] = current->next;
+			}
+			else{
+				prev->next = current->next;
+			}
+			free(current->key);
+			if(current->content != NULL){
+				free(current->content);
+			}
+			free(current);
+			table->entriesNumber--;			
+			return 0;
+		}
+		prev = current;
+		current = current->next;
+	}
+	return -1;
+}
 
 

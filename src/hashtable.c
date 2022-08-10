@@ -1,7 +1,9 @@
 #include <stdlib.h>
+#include <string.h>
 
 #include <hash.h>
 #include <list.h>
+
 
 struct hashItem{
 	char* key;
@@ -105,4 +107,19 @@ int hashRemove(hashTable* table, char* key){
 	return -1;
 }
 
+void* hashSearch(hashTable* table, char* key){
+	if(table == NULL || key == NULL){
+		errno = EINVAL;
+		return NULL;
+	}
+	int tmpHash = hashFunc(key) % table->tableSize;
+	hashItem* current = table->items[tmpHash];
+	while(current != NULL){
+		if(strcmp(current->key, key) == 0){
+			return current->content;
+		}
+		current = current->next;
+	}
+	return NULL;
+}
 

@@ -43,18 +43,21 @@ locker* lockerInit(){
 
 
 int readLock(locker* lock){
+	int err;
 	if(lock == NULL){
 		errno = EINVAL;
 		return -1;
 	}
-	if(pthread_mutex_lock(&(lock->mux)) != 0){
+	if((err = pthread_mutex_lock(&(lock->mux))) != 0){
+		errno = err;
 		return -1;					//fatal error
 	}
 	while(lock->writerPresence){				//waiting for writer/s to finish
 		pthread_cond_wait(&(lock->cond), &(lock->mux));
 	}
 	lock->readersNumber++;					//a reader joined the reader's group
-	if(pthread_mutex_unlock(&(lock->mux)) != 0){
+	if((err = pthread_mutex_unlock(&(lock->mux))) != 0){
+		errno = err;
 		return -1;
 	}
 	
@@ -62,23 +65,73 @@ int readLock(locker* lock){
 }
 
 int readUnlock(locker* lock){
+	int err;
 	if(lock == NULL){
 		errno = EINVAL;
 		return -1;
 	}
-	if(pthread_mutex_lock(&(lock->mux)) != 0){
+	if((err = pthread_mutex_lock(&(lock->mux))) != 0) != 0){
+		errno = err;
 		return -1;
 	}
 	lock->readersNumber--;					//a reader left the reader's group
 	if(lock->readersNumber == 0){
 		pthread_cond_signal(&(lock->cond));
 	}					
-	if(pthread_mutex_unlock(&(lock->mux)) != 0){
+	if((err = pthread_mutex_unlock(&(lock->mux))) != 0) != 0){
+		errno = err;
 		return -1;
 	}
 	
 	return 0;
 
+}
+
+int writeLock(locker* lock){
+	int err;
+	if(lock == NULL){
+		errno = EINVAL;
+		return -1;
+	}
+	if((err = pthread_mutex_lock(&(lock->mux))) != 0){
+		errno = err;
+		return -1;
+	}	
+	while(writerPresence){					//writer waits for other writers to finish
+		pthread_cond_wait(&(lock->cond), &(lock->mux));
+	}					
+	writerPresence = true;
+	while(lock->readersNumber != 0){			//writer waits for readers to finish
+		pthread_cond_wait(&(lock->cond), &(lock->mux));
+	}	
+				
+	if((err = pthread_mutex_unlock(&(lock->mux))) != 0){
+		errno = err;
+		return -1;
+	}
+	
+	return 0;
+
+}
+
+int writeUnlock(locker* lock){
+	int err;
+	if(lock == NULL){
+		errno = EINVAL;
+		return -1;
+	}
+	if((err = pthread_mutex_lock(&(lock->mux))) != 0){
+		errno = err;
+		return -1;
+	}				
+	writerPresence = false;
+	pthread_cond_broadcast(&(lock->cond));			
+	if((err = pthread_mutex_unlock(&(lock->mux))) != 0){
+		errno = err;
+		return -1;
+	}
+	
+	return 0;
 }
 
 

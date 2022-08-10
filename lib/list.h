@@ -11,7 +11,6 @@ elem* getHead(list* list);
 
 elem* getTail(list* list);
 
-
 void printList(list* list);
 
 elem* appendList(list* list, void* content);

@@ -55,7 +55,7 @@ void printList(list* list){
 	}	
 	elem* tmp = list->head;
 	while(elem != NULL) {
-		printf("%s\n", (char*)elem->content);
+		printf("%s\n", (char*)elem->info);
 		elem = elem->next;
 	}
 

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <errno.h>
 
 #include <list.h>
 #include <hashtable.h>
@@ -14,6 +15,7 @@
 //repPolicy = 1 ==> LRU
 
 struct storedFile{
+
 	char* name;
 	long size;
 	void* content;
@@ -96,11 +98,11 @@ int storageOpenFile(storage* storage, char* filename, int flags, int client){
 	}
 	if(flags & O_CREATE){
 		//enters as a writer
-		if(writeLock(&(storage->mux)) != 0){
+		if(writeLock(storage->mux) != 0){
 			return -2;
 		}
 		if(hashSearch(storage->files, filename) != NULL){
-			if(writeUnlock(&(storage->mux) != 0){
+			if(writeUnlock(storage->mux) != 0){
 				return -2;
 			}
 			errno = EEXIST;					//EEXIST 17 File già esistente (from "errno -l")
@@ -133,29 +135,29 @@ int storageOpenFile(storage* storage, char* filename, int flags, int client){
 		}
 		newFile->lastAccess = time(NULL);
 		hashInsert(storage->files, filename, (void*)newFile);
-		if(writeUnlock(&(storage->mux)) != 0){
+		if(writeUnlock(storage->mux) != 0){
 			return -2;
 		}
 		return 0;
 	}
 	else{
 		//enters as a reader
-		if(readLock(&(storage->mux)) != 0){
+		if(readLock(storage->mux) != 0){
 			return -2;
 		}
 		storedFile* openF;
 		if((openF = hashSearch(storage->files, filename)) == NULL){
-			if(readUnlock(&(storage->mux)) != 0){
+			if(readUnlock(storage->mux) != 0){
 				return -2;
 			}
 			errno = ENOENT;					//ENOENT 2 File o directory non esistente (from "errno -l")
 			return -1;
 		}
 		//it is needed to modify whoOpened and clientLocker (if O_LOCK flag is set)
-		if(writeLock(&(storage->mux)) != 0){
+		if(writeLock(openF->mux) != 0){
 			return -2;
 		}
-		if(readUnlock(&(storage->mux)) != 0){
+		if(readUnlock(storage->mux) != 0){
 			return -2;
 		}
 		if(flags & O_LOCK){
@@ -163,7 +165,7 @@ int storageOpenFile(storage* storage, char* filename, int flags, int client){
 				openF->clientLocker = client;
 			}
 			else{
-				if(writeUnlock(&(storage->mux)) != 0){
+				if(writeUnlock(openF->mux) != 0){
 					return -2;
 				}
 				errno = EACCES 				//EACCES 13 Permesso negato (from "errno -l")
@@ -176,16 +178,82 @@ int storageOpenFile(storage* storage, char* filename, int flags, int client){
 			return -2
 		}
 		snprintf(clientStr, length + 1, "%d", client);
-		if((containsList(openF->whoOpened, clientStr)) != 0){
+		if((containsList(openF->whoOpened, clientStr)) == 0){
 			appendList(newFile->whoOpened, clientStr);
 		}
 		openF->lastAccess = time(NULL);
-		if(writeUnlock(&(storage->mux)) != 0){
+		if(writeUnlock(openF->mux) != 0){
 			return -2;
 		}	
 	
 	
 	}
 	return 0;
+}
+
+long storageReadFile(storage* storage, char* filename, void** sentCont, int client){
+	
+	long bytesSent;
+	if(storage == NULL || filename == NULL){
+		errno = EINVAL;
+		return 0;
+	}
+	if(readLock(&(storage->mux)) != 0){
+		return -2;
+	}
+	storedFile* readF;
+	if((readF = hashSearch(storage->files)) == NULL){
+		if(readUnlock(storage->mux) != 0){
+			return -2;
+		}
+		errno = ENOENT;					
+		return -1;
+	}
+	if(readLock(readF->mux) != 0){
+		return -2;
+	}
+	if(readUnlock(storage->mux) != 0){
+		return -2;
+	}
+	int length = snprintf(NULL, 0, "%d", client);
+	char* clientStr;
+	if(clientStr = malloc(length + 1)){
+		return -2
+	}
+	snprintf(clientStr, length + 1, "%d", client);
+	if((containsList(readF->whoOpened, clientStr)) != 0){
+		if(readUnlock(readF->mux) != 0){
+			return -2;
+		}
+		errno = EACCES;
+		return -1;
+	}
+	if(readF->clientLocker == -1 || readF->clientLocker == client){
+		if(readF->size == 0){
+			*sentCont = "";
+		}
+		else{
+			if((*sentCont = malloc(readF->size)) == NULL){
+				return -2;
+			}
+			memcpy(*sentCont, readF->content, readF->size);
+			bytesSent = readF->size;
+			if(readUnlock(readF->mux) != 0){
+				return -2;
+			}
+			return bytesSent;
+		}
+	
+	}
+	else{
+		if(readUnlock(readF->mux) != 0){
+			return -2;
+		}
+		errno = EACCES;
+		return -1;
+	
+	}
+	return 0;
+	
 }
 

@@ -5,8 +5,10 @@
 #include <list.h>
 #include <hashtable.h>
 #include <locker.h>
+#include <functions.h>
 
 #define MAXFILELEN 24
+#define MAXLEN 256
 
 //repPolicy = 0 ==> FIFO
 //repPolicy = 1 ==> LRU
@@ -50,7 +52,7 @@ storage* storageInit(int maxFiles, long maxMB, int repPolicy){
 	}
 	storage* newStorage;
 	
-	if(newStorage = malloc(sizeof(storage)) == NULL){
+	if((newStorage = malloc(sizeof(storage))) == NULL){
 		return NULL;
 	}
 	newStorage->maxFiles = maxFiles;
@@ -86,6 +88,104 @@ storage* storageInit(int maxFiles, long maxMB, int repPolicy){
 	return newStorage;
 }
 
-
-
+int storageOpenFile(storage* storage, char* filename, int flags, int client){
+	
+	if(storage == NULL || filename == NULL){
+		errno = EINVAL;
+		return -1;
+	}
+	if(flags & O_CREATE){
+		//enters as a writer
+		if(writeLock(&(storage->mux)) != 0){
+			return -2;
+		}
+		if(hashSearch(storage->files, filename) != NULL){
+			if(writeUnlock(&(storage->mux) != 0){
+				return -2;
+			}
+			errno = EEXIST;					//EEXIST 17 File già esistente (from "errno -l")
+			return -1;
+		}
+		storedFile* newFile;
+		if((newFile = malloc(sizeof(storedFile))) == NULL){
+			return -2;
+		}
+		
+		if((newFile->name = malloc(strlen(filename)*sizeof(char)+1)) == NULL){
+			return -2;
+		}
+		strcpy(newFile->name, filename);
+		newFile->size = 0;
+		newFile->content = NULL;
+		newFile->whoOpened = initList();
+		int length = snprintf(NULL, 0, "%d", client);
+		char* clientStr;
+		if(clientStr = malloc(length + 1)){
+			return -2
+		}
+		snprintf(clientStr, length + 1, "%d", client);
+		appendList(newFile->whoOpened, clientStr);
+		if(flags & O_LOCK){
+			newFile->lockerClient = client;
+		}
+		else{
+			newFile->lockerClient = -1;
+		}
+		newFile->lastAccess = time(NULL);
+		hashInsert(storage->files, filename, (void*)newFile);
+		if(writeUnlock(&(storage->mux)) != 0){
+			return -2;
+		}
+		return 0;
+	}
+	else{
+		//enters as a reader
+		if(readLock(&(storage->mux)) != 0){
+			return -2;
+		}
+		storedFile* openF;
+		if((openF = hashSearch(storage->files, filename)) == NULL){
+			if(readUnlock(&(storage->mux)) != 0){
+				return -2;
+			}
+			errno = ENOENT;					//ENOENT 2 File o directory non esistente (from "errno -l")
+			return -1;
+		}
+		//it is needed to modify whoOpened and clientLocker (if O_LOCK flag is set)
+		if(writeLock(&(storage->mux)) != 0){
+			return -2;
+		}
+		if(readUnlock(&(storage->mux)) != 0){
+			return -2;
+		}
+		if(flags & O_LOCK){
+			if(openF->clientLocker == -1 || openF->clientLocker == client){
+				openF->clientLocker = client;
+			}
+			else{
+				if(writeUnlock(&(storage->mux)) != 0){
+					return -2;
+				}
+				errno = EACCES 				//EACCES 13 Permesso negato (from "errno -l")
+				return -1;				
+			}
+		}
+		int length = snprintf(NULL, 0, "%d", client);
+		char* clientStr;
+		if(clientStr = malloc(length + 1)){
+			return -2
+		}
+		snprintf(clientStr, length + 1, "%d", client);
+		if((containsList(openF->whoOpened, clientStr)) != 0){
+			appendList(newFile->whoOpened, clientStr);
+		}
+		openF->lastAccess = time(NULL);
+		if(writeUnlock(&(storage->mux)) != 0){
+			return -2;
+		}	
+	
+	
+	}
+	return 0;
+}
 

@@ -13,9 +13,6 @@
 #define MAXLEN 256
 #define UNIX_PATH_MAX 108
 
-#define O_CREATE 1
-#define O_LOCK 2
-
 #define HELP \
 "Usage: ./client -f <filename> [OPTIONS]\n"\
 "-h :				show help message\n"\

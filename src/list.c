@@ -5,7 +5,7 @@
 #include <list.h>
 
 struct elem{
-	void* info;
+	char* info;
 	struct elem* next;
 	struct elem* prev;
 }
@@ -61,7 +61,7 @@ void printList(list* list){
 
 }
 
-elem* appendList(list* list, void* content){
+elem* appendList(list* list, char* content){
 
 	if(list == NULL || content == NULL){
 		return NULL;
@@ -145,7 +145,7 @@ int containsList(list* list, char* str){
 	elem* current = list->head;
 	char* tmp;
 	while(current != NULL){
-		tmp = current->name;
+		tmp = current->info;
 		if(strcmp(tmp, str) == 0){
 			return 1;
 		}
@@ -162,7 +162,7 @@ int removeList(list* list, char* str){
 	elem* current = list->head;
 	char* tmp;
 	while(current != NULL){
-		tmp = current->name;
+		tmp = current->info;
 		if(strcmp(tmp, str) != 0){
 			current = current->next;
 		}

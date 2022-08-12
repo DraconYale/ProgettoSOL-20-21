@@ -5,7 +5,7 @@
 #include <list.h>
 
 struct elem{
-	char* info;
+	void* info;
 	struct elem* next;
 	struct elem* prev;
 }
@@ -61,7 +61,7 @@ void printList(list* list){
 
 }
 
-elem* appendList(list* list, char* content){
+elem* appendList(list* list, void* content){
 
 	if(list == NULL || content == NULL){
 		return NULL;

@@ -122,7 +122,7 @@ int storageOpenFile(storage* storage, char* filename, int flags, int client){
 		newFile->whoOpened = initList();
 		int length = snprintf(NULL, 0, "%d", client);
 		char* clientStr;
-		if(clientStr = malloc(length + 1)){
+		if((clientStr = malloc(length + 1)) == NULL){
 			return -2
 		}
 		snprintf(clientStr, length + 1, "%d", client);
@@ -174,7 +174,7 @@ int storageOpenFile(storage* storage, char* filename, int flags, int client){
 		}
 		int length = snprintf(NULL, 0, "%d", client);
 		char* clientStr;
-		if(clientStr = malloc(length + 1)){
+		if((clientStr = malloc(length + 1)) == NULL){
 			return -2
 		}
 		snprintf(clientStr, length + 1, "%d", client);
@@ -217,7 +217,7 @@ long storageReadFile(storage* storage, char* filename, void** sentCont, int clie
 	}
 	int length = snprintf(NULL, 0, "%d", client);
 	char* clientStr;
-	if(clientStr = malloc(length + 1)){
+	if((clientStr = malloc(length + 1)) == NULL){
 		return -2
 	}
 	snprintf(clientStr, length + 1, "%d", client);
@@ -256,4 +256,56 @@ long storageReadFile(storage* storage, char* filename, void** sentCont, int clie
 	return 0;
 	
 }
+
+int storageReadNFiles(storage* storage, int N, list** sentFilesList, int client){
+	if(storage == NULL || sentContList == NULL){
+		errno = EINVAL;
+		return -1;
+	}
+	int maxReached = 0
+	int counter = 0;
+	if(readLock(&(storage->mux)) != 0){
+		return -2;
+	}
+	if(N <= 0){
+		N = storage->filesNumb;
+	}
+	elem* listElem = storage->filesFIFOQueue;
+	if(listElem == NULL){
+		if(readUnlock(storage->mux) != 0){
+			return -2;
+		}
+		return -1;
+	}
+	while(counter < N && !maxReached){
+		storedFile* kFile = hashSearch(storage->files, listElem->info);
+		if(readLock(kFile->mux) != 0){
+			return -2;
+		}
+		if(appendList(*sentFilesList, kFile) == NULL){
+			if(readUnlock(copyF->mux) != 0){
+				return -2;
+			}
+			if(readUnlock(storage->mux) != 0){
+				return -2;
+			}
+			return -1;
+		}
+		if(readUnlock(kFile->mux) != 0){
+			return -2;
+		}
+		counter++;
+		listElem = nextList(storage->filesFIFOQueue, listElem);
+		if(listElem == NULL){
+			maxReached = 1;
+		}
+	}
+	if(readUnlock(storage->mux) != 0){
+		return -2;
+	}
+	return counter;
+}
+
+
+
 

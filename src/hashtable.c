@@ -77,7 +77,7 @@ int hashInsert(hashTable* table, char* key, void* content){
 
 }
 
-int hashRemove(hashTable* table, char* key){
+int hashRemove(hashTable* table, void* key){
 	if(table == NULL || key == NULL){
 		errno = EINVAL;
 		return -1;

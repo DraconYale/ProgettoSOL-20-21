@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <string.h>
 #include <errno.h>
 
 #include <list.h>
@@ -279,22 +280,45 @@ int storageReadNFiles(storage* storage, int N, list** sentFilesList, int client)
 	}
 	while(counter < N && !maxReached){
 		storedFile* kFile = hashSearch(storage->files, listElem->info);
+		storedFile* file = NULL;
 		if(readLock(kFile->mux) != 0){
 			return -2;
 		}
-		if(appendList(*sentFilesList, kFile) == NULL){
-			if(readUnlock(copyF->mux) != 0){
+		if(kFile->clientLocker == client || kFile->clientLocker == -1){
+			//a copy of the read file is used
+			if((file = malloc(sizeof(storedFile)) == NULL){
 				return -2;
 			}
-			if(readUnlock(storage->mux) != 0){
+			memset(file, 0, sizeof(storedFile));
+			if((file->name = malloc(strlen(kFile->name)*sizeof(char)+1)) == NULL){
 				return -2;
 			}
-			return -1;
+			memcpy(file->name, kFile->name, strlen(kFile->name)+1);
+			file->size = kFile->size;
+			if((file->content = malloc(kFile->size)) == NULL){
+				return -2;
+			}
+			memcpy(file->content, kFile->content, kFile->size);
+			if(appendList(*sentFilesList, file) == NULL){
+				if(readUnlock(kFile->mux) != 0){
+					return -2;
+				}
+				if(readUnlock(storage->mux) != 0){
+					return -2;
+				}
+				//TODO free file
+				return -1;
+			}
+			if(readUnlock(kFile->mux) != 0){
+				return -2;
+			}
+			counter++;
 		}
-		if(readUnlock(kFile->mux) != 0){
-			return -2;
+		else{
+			if(readUnlock(kFile->mux) != 0){
+				return -2;
+			}
 		}
-		counter++;
 		listElem = nextList(storage->filesFIFOQueue, listElem);
 		if(listElem == NULL){
 			maxReached = 1;

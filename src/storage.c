@@ -130,22 +130,24 @@ storedFile* getVictim(storage* storage){
 			char* victimName = victimElem->info;
 			storedFile* victim = hashSearch(storage->files, victimName);
 			elem* tmpElem = nextList(storage->filesFIFOQueue, victimElem);
-			char tmpName = tmpElem->info;
-			storedFile tmpVict = hashSearch(storage->files, tmpName);
-			double tmpTime = 0;
-			double maxDiffTime = fabs(difftime(victim->lastAccess, tmpVict->lastAccess));
-			while(tmpElem != NULL){
-				tmpTime = difftime(victim->lastAccess, tmpVict->lastAccess);
-				if(fabs(tmpTime) > fabs(maxDiffTime)){
-					maxDiffTime = fabs(tmpTime);
-					if(tmpTime > 0){
-						victim = tmpVict;
-					}
+			if(tmpElem != NULL){
+				char tmpName = tmpElem->info;
+				storedFile tmpVict = hashSearch(storage->files, tmpName);
+				double tmpTime = 0;
+				double maxDiffTime = fabs(difftime(victim->lastAccess, tmpVict->lastAccess));
+				while(tmpElem != NULL){
+					tmpTime = difftime(victim->lastAccess, tmpVict->lastAccess);
+					if(fabs(tmpTime) > fabs(maxDiffTime)){
+						maxDiffTime = fabs(tmpTime);
+						if(tmpTime > 0){
+							victim = tmpVict;
+						}
 				
+					}
+					tmpElem = nextList(storage->filesFIFOQueue, tmpElem);
+					tmpName = tmpElem->info;
+					tmpVict = hashSearch(storage-files, tmpName);
 				}
-				tmpElem = nextList(storage->filesFIFOQueue, tmpElem);
-				tmpName = tmpElem->info;
-				tmpVict = hashSearch(storage-files, tmpName);
 			}
 			if(writeLock(victim->mux) != 0){
 				return NULL;
@@ -425,7 +427,7 @@ int storageReadNFiles(storage* storage, int N, list** sentFilesList, int client)
 //storageWriteFile fails if the file is not "new" or locked by client (file needs to be opened wit O_CREATE and O_LOCK)
 int storageWriteFile(storage* storage, char* name, void* content, long contentSize, list** victims, int client){
 	
-	if(storage == NULL || name == NULL || data == NULL || datasize <= 0 || victims == NULL){
+	if(storage == NULL || name == NULL || content == NULL || contentSize <= 0 || victims == NULL){
 		errno = EINVAL;
 		return -1;
 	}
@@ -489,7 +491,7 @@ int storageWriteFile(storage* storage, char* name, void* content, long contentSi
 	
 		
 	//check if there is enough space
-	while(storage->fileNumber + 1 > storage->maxFiles || storage->sizeMB + dataSize > storage->maxMB){
+	while(storage->fileNumber + 1 > storage->maxFiles || storage->sizeMB + contentSize > storage->maxMB){
 			storedFile* victim; 
 			if((victim = getVictim(storage)) == NULL){
 				return -2
@@ -517,5 +519,83 @@ int storageWriteFile(storage* storage, char* name, void* content, long contentSi
 
 }
 
+int storageAppendFile(storage* storage, char* name, void* content, long contentSize, list** victims, int client){
+	
+	if(storage == NULL || name == NULL || content == NULL || contentSize <= 0 || victims == NULL){
+		errno = EINVAL;
+		return -1;
+	}
+	if(writeLock(&(storage->mux)) != 0){
+		return -2;
+	}
+	storedFile* writeF;
+	if((writeF = hashSearch(storage->files, name)) == NULL){
+		if(writeUnlock(&(storage->mux)) != 0){
+			return -2;
+		}
+		errno = ENOENT;					
+		return -1;
+	}
+	if(writeLock(&(writeF->mux)) != 0){
+		return -2;
+	}
+	
+	//check if client opened this file
+	int length = snprintf(NULL, 0, "%d", client);
+	char* clientStr;
+	if((clientStr = malloc(length + 1)) == NULL){
+		return -2
+	}
+	snprintf(clientStr, length + 1, "%d", client);
+	if(!containsList(writF->whoOpened, clientStr)){
+		if(writeUnlock(&(storage->mux)) != 0){
+			return -2;
+		}
+		if(writeLock(&(writeF->mux)) != 0){
+			return -2;
+		}
+		errno = EACCES;
+		return -1;
+	
+	}
+	
+	if(writeF->clientLocker == -1 || writeF->clientLocker == client){	
+		//check if there is enough space
+		while(storage->fileNumber + 1 > storage->maxFiles || storage->sizeMB + contentSize > storage->maxMB){
+				storedFile* victim; 
+				if((victim = getVictim(storage)) == NULL){
+					return -2
+				}
+				appendList(*victims, victim);
+		}
+		
+		if((writeF->content = realloc(writeF->content, writeF->size + contentSize)) == NULL){
+			return -2;
+		}
+		memcpy(writeF->content + writeF->size, content, contentSize);
+		writeF->size = writeF->size + contentSize;
+			
+		storage->sizeMB = storage->sizeMB + contentSize;
+		updateStorage(storage);
+		if(writeLock(&(writeF->mux)) != 0){
+			return -2;
+		}
+		if(writeUnlock(&(storage->mux)) != 0){
+			return -2;
+		}
+		
+		return 0;
+	}
+	else{
+		if(writeUnlock(&(storage->mux)) != 0){
+			return -2;
+		}
+		if(writeLock(&(writeF->mux)) != 0){
+			return -2;
+		}
+		errno = EACCES;
+		return -1;
+	}
+}
 
 

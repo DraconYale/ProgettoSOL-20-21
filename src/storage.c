@@ -121,6 +121,7 @@ storedFile* getVictim(storage* storage){
 			free(victim->content);
 			freeList(victim->whoOpened);
 			freeLock(victim->mux);
+			removeList(storage->listFIFOQueue, victim);
 			hashRemove(storage->files, victim);
 			return copyV;		
 		
@@ -778,6 +779,77 @@ int storageCloseFile(storage* storage, char* filename, int client){
 			}
 			return 0;
 		}
+	}
+}
+
+int storageRemoveFile(storage* storage, char* name, long* bytesR, int client){
+	
+	if(storage == NULL || name == NULL){
+		errno = EINVAL;
+		return -1;
+	}
+	
+	if(writeLock(&(storage->mux)) != 0){
+		return -2;
+	}
+	storedFile* removeF;
+	if((removeF = hashSearch(storage->files, name)) == NULL){
+		if(writeUnlock(&(storage->mux)) != 0){
+			return -2;
+		}
+		errno = ENOENT;					
+		return -1;
+	}
+	if(writeLock(&(removeF->mux)) != 0){
+		return -2;
+	}
+	
+	int length = snprintf(NULL, 0, "%d", client);
+	char* clientStr;
+	if((clientStr = malloc(length + 1)) == NULL){
+		return -2
+	}
+	snprintf(clientStr, length + 1, "%d", client);
+	if(!containsList(removeF->whoOpened, clientStr)){
+		if(writeUnlock(&(removeF->mux)) != 0){
+			return -2;
+		}
+		errno = EACCES;
+		return -1;
+	
+	}
+	
+	//file needs to be locked
+	if(removeF->lockerClient == client){
+		*bytesR = removeF->size;
+		storage->filesNumb--;
+		storage->sizeMB = storage->sizeMB - removeF->size;
+		free(removeF->name);
+		free(removeF->content);
+		freeList(removeF->whoOpened);
+		freeLock(removeF->mux);
+		removeList(storage->listFIFOQueue, removeF);
+		hashRemove(storage->files, removeF);
+		if(writeUnlock(&(storage->mux)) != 0){
+			return -2;
+		}
+		if(writeUnlock(&(removeF->mux)) != 0){
+			return -2;
+		}
+		return 0;
+		
+	}
+	else{
+	
+		if(writeUnlock(&(storage->mux)) != 0){
+			return -2;
+		}
+		if(writeUnlock(&(removeF->mux)) != 0){
+			return -2;
+		}
+		errno = EACCES;
+		return -1;
+		
 	}
 }
 

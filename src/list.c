@@ -154,7 +154,7 @@ int containsList(list* list, char* str){
 	return 0;
 }
 
-int removeList(list* list, char* str){
+int removeList(list* list, void* str){
 	if (list == NULL || str == NULL){
 		errno = EINVAL;
 		return -1;

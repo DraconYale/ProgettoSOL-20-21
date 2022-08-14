@@ -123,3 +123,22 @@ void* hashSearch(hashTable* table, char* key){
 	return NULL;
 }
 
+int freeHash(hashtable* table){
+	if(table == NULL){
+		return 0;
+	}
+	int i = 0;
+	for(i = 0, i < table->tablesize, i++){
+		hashItem* current = table->items[i];
+		hashItem* tmp = NULL;
+		while(current != NULL){
+			free(current->key);
+			free(current->content);
+			tmp = current;
+			current = current->next;
+			free(tmp);
+		}
+	}
+	return 0;
+}
+

@@ -853,4 +853,13 @@ int storageRemoveFile(storage* storage, char* name, long* bytesR, int client){
 	}
 }
 
+int freeStorage(storage* storage){
+	if(storage == NULL){
+		return 0;
+	}
+	freeHash(storage->files);
+	freeLock(storage->mux);
+	freeList(storage->listFIFOQueue);
+	free(storage);
+}
 

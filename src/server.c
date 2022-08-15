@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
+#include <sys/time.h>
 #include <sys/socket.h>
 #include <sys/select.h>
 #include <pthread.h>
@@ -14,6 +15,22 @@
 
 #define BUFFERSIZE 256
 #define UNIX_PATH_MAX 108
+#define COMMLENGTH 1024
+
+typedef struct workArg{
+	storage* storage;
+	boundedBuffer* commands;
+	int pipeOut;
+	FILE* log;
+}workArg;
+
+typedef struct serverInfo{
+
+	//TODO
+
+
+
+}serverInfo;
 
 volatile sig_atomic_t term = 0; 		//term = 1 when SIGINT or SIGQUIT
 volatile sig_atomic_t blockNewClients = 0; 	//blockNewClients = 1 when SIGHUP
@@ -143,6 +160,11 @@ int main (int argc, char** argv){
 	}
 	
 	//starting threads (to be fully implemented) 
+	workArg* workArgs = malloc(sizeof(workArg));
+	workArgs->storage = storage;
+	workArgs->commands = jobQueue;
+	workArgs->pipeOut = pipeMW[1];
+	workArgs->log = logFile;
 	pthred_t* workerThreads;
 	if((workerThreads = malloc(config->workerNumber * sizeof(pthread_t))) == NULL){
 		perror("malloc");
@@ -151,16 +173,104 @@ int main (int argc, char** argv){
 	int i = 0;
 	while(i < config->workerNumber){
 		
-		if((pthread_create(&(workerThreads[i], NULL, function, (void*) args))) != 0){
+		if((pthread_create(&(workerThreads[i], NULL, &workerFunc, (void*) workArgs))) != 0){
 			perror("pthread_create workers");
 			return -1;
 		}
 		i++;
 	
 	}
+	
+	//request management
+	int clientsOnline = 0;
+	fd_set setCopy;
+	struct timeval timeout;
+	timeout->tv_sec = 0;
+	timeout->tv_usec = 200000	//200 ms
+	struct timeval timeCopy;
+	int fd_client = -1;
+	char* command[COMMLENGTH];
+	memset(command, 0, COMMLENGTH);
+	int re_fd;
+	
+	while(true){
+	
+		//SIGINT or SIGQUIT
+		if(term){
+			//TODO
+		}
+		//SIGHUP
+		if(blockNewClients && clientsOnline == 0){
+			//TODO
+		}
+		
+		setCopy = readManagerSet;
+		timeCopy = timeout;
+	
+		if((select(fd_num+1, &setCopy, NULL, NULL, &timeCopy)) == -1){
+		
+			//TODO
+		
+		
+		}
+		i = 0;
+		//we need to test all ready fds with FD_ISSET
+		for(i = 0, i < fd_num + 1; i++){
+			if(FD_ISSET(i, &setCopy)){
+				//client connection
+				if(i == fd_skt){
+				
+					if((fd_client = accept(fd_skt, NULL, 0)) != -1){					
+						FD_SET(fd_client, &readManagerSet);
+						clientsOnline++;
+						if(fd_client > fd_num){
+							fd_num = fd_client;
+						}
+					}
+					else{
+						perror("accept");
+						return -1;
+					}
+				}
+				
+				//pipe notifies that a request has been satisfied
+				if(i == pipeMW[0]){
+				
+					if(readn(i, (void*) re_fd, sizeof(int)) <= 0){
+						printf("Errore pipe\n");
+						return -1;
+					}
+					FD_SET(re_fd, &managerReadSet);
+					if(re_fd > fd_num){
+						fd_num = re_fd,
+					}
+				
+				}
+				//new request
+				else{
+					memset(command, 0, COMMLENGTH);
+					if(readn(i, (void*) command, COMMLENGTH) <= 0){
+						clientsOnline--;
+						FD_CLR(i, &managerReadSet);
+						close(i);
+					}
+					else{
+						if(i == fd_num){
+							fd_num--;
+						}
+						if(enqueueBuffer(jobQueue, command) == -1){
+							perror("enqueue");
+							return -1;						
+						}
+					
+					}
+				
+				
+				}
+						
+			}
+		
+		}
+	}
 	return 0;
-
-
-
-
 }

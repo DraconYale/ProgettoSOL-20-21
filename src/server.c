@@ -65,12 +65,16 @@ void* workFunc(void* args){
 	FILE* logFile = arguments->log;
 	char* fdString;
 	int fd_client;
+	char* returnStr;
 	char* command;
 	char* tokComm;
 	char* token;
 	char* operation;
 	char* pathname;
 	int flags;
+	void* sentBuf;
+	long sentSize; 
+	char* sizeStr[BUFFERSIZE];
 	char* strtokState = NULL;
 	char* errorString;
 	
@@ -100,6 +104,11 @@ void* workFunc(void* args){
 				token = strtok_r(NULL, " ", &strtokState);
 				sscanf(token, "%d", &flags);
 				err = storageOpenFile(storage, pathname, flags, fd_client);
+				memset(returnStr, 0, 32);
+				snprintf(returnStr, 32, "%d", err);
+				if((writen(fd_client, (void*) returnStr, strlen(returnStr) + 1)) <= 0){
+					return -1;
+				}
 				//log
 				switch(err){
 					case 0: 
@@ -127,7 +136,56 @@ void* workFunc(void* args){
 				if(writen(pOut, (void*) pOut, BUFFERSIZE) == -1);
 				break;			
 			}
-		
+			//READ
+			if(strncmp(operation, "READ", 4) == 0){
+				sentBuf = NULL;
+				sentSize = 0;
+				memset(pathname, 0, UNIX_PATH_MAX);
+				token = strtok_r(NULL, " ", &strtokState);
+				pathname = token;
+				err = storageReadFile(storage, pathname, &sentBuf, &sentSize, fd_client);
+				memset(returnStr, 0, 32);
+				snprintf(returnStr, 32, "%d", err);
+				if((writen(fd_client, (void*) returnStr, strlen(returnStr) + 1)) <= 0){
+					return -1;
+				}
+				//log
+				switch(err){
+					case 0: 
+						perror("storageReadFile")
+						break;
+					
+					case -1:
+						memset(errorString, 0, 32);
+						snprintf(errorString, 32, "%d", errno);
+						if(writen(fd_client, (void *)errorString, 32) == -1){
+							return -1;
+						}
+						break;
+						
+					case -2				
+						memset(errorString, 0, 32);
+						snprintf(errorString, 32, "%d", errno);
+						if(writen(fd_client, (void *)errorString, 32) == -1){
+							return -1;
+						}
+						return -1;
+				
+				}
+				memset(sizeStr, 0, BUFFERSIZE);
+				snprintf(sizeStr, BUFFERSIZE, "%l", sentSize);
+				if((writen(fd_client, (void*) sentSize, BUFFERSIZE)) <= 0){
+					return -1;
+				}
+				if((writen(fd_client, (void*) sentBuf, sentSize) <= 0){
+					return -1;
+				}
+				free(sentBuf);
+				memset(pOut, 0, BUFFERSIZE);
+				snprintf(pOut, BUFFERSIZE, "%d", fd_client);
+				if(writen(pOut, (void*) pOut, BUFFERSIZE) == -1);
+				break;			
+			}
 		}
 	
 	

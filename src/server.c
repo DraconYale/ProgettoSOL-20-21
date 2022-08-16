@@ -15,7 +15,7 @@
 
 #define BUFFERSIZE 256
 #define UNIX_PATH_MAX 108
-#define COMMLENGTH 1024
+#define COMMLENGTH 32
 
 typedef struct workArg{
 	storage* storage;
@@ -55,6 +55,112 @@ void* signalHandling(void* set){
 
 }
 
+void* workFunc(void* args){
+	
+	int err;
+	workArg* arguments = (workArg*) args;
+	storage* storage = arguments->storage;
+	boundedBuffer* commands = arguments->commands;
+	int pOut = arguments->pipeOut;
+	FILE* logFile = arguments->log;
+	char* fdString;
+	int fd_client;
+	char* command;
+	char* tokComm;
+	char* token;
+	char* operation;
+	char* pathname;
+	int flags;
+	char* strtokState = NULL;
+	char* errorString;
+	
+	//messages from clients are like "opcode arguments"
+	//strtok_r is used to retrieve the arguments
+	while(1){
+		fdString = NULL;
+		if(bufferDequeue(commands, &fdString) != 0){
+			perror("dequeue");
+			return -1;		
+		}
+		sscanf(fdString, "%d", &fd_client);
+		memset(command, 0, COMMLENGTH);
+		if(readn(fd_ready, (void*) command, COMMLENGTH)) <= 0){
+			return -1;		
+		}
+		tokComm = command;
+		token = strtok_r(tokComm, " ", &strtokState);
+		if(token != NULL){
+			operation = token;
+			//OPEN
+			if(strncmp(operation, "OPEN", 4) == 0){
+				memset(pathname, 0, UNIX_PATH_MAX);
+				token = strtok_r(NULL, " ", &strtokState);
+				pathname = token;
+				flags = 0;
+				token = strtok_r(NULL, " ", &strtokState);
+				sscanf(token, "%d", &flags);
+				err = storageOpenFile(storage, pathname, flags, fd_client);
+				//log
+				switch(err){
+					case 0: 
+						break;
+					
+					case -1:
+						memset(errorString, 0, 32);
+						snprintf(errorString, 32, "%d", errno);
+						if(writen(fd_client, (void *)errorString, 32) == -1){
+							return -1;
+						}
+						break;
+						
+					case -2				
+						memset(errorString, 0, 32);
+						snprintf(errorString, 32, "%d", errno);
+						if(writen(fd_client, (void *)errorString, 32) == -1){
+							return -1;
+						}
+						return -1;
+				
+				}
+				memset(pOut, 0, BUFFERSIZE);
+				snprintf(pOut, BUFFERSIZE, "%d", fd_client);
+				if(writen(pOut, (void*) pOut, BUFFERSIZE) == -1);
+				break;			
+			}
+		
+		}
+	
+	
+	
+	
+	
+	}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+}
 
 int main (int argc, char** argv){
 
@@ -249,19 +355,13 @@ int main (int argc, char** argv){
 				//new request
 				else{
 					memset(command, 0, COMMLENGTH);
-					if(readn(i, (void*) command, COMMLENGTH) <= 0){
-						clientsOnline--;
-						FD_CLR(i, &managerReadSet);
-						close(i);
+					snprintf(command, COMMLENGTH, "%d", i);
+					if(i == fd_num){
+						fd_num--;					
 					}
-					else{
-						if(i == fd_num){
-							fd_num--;
-						}
-						if(enqueueBuffer(jobQueue, command) == -1){
-							perror("enqueue");
-							return -1;						
-						}
+					if(bufferEnqueue(jobQueue, command) == -1){
+						perror("enqueue");
+						return -1;
 					
 					}
 				

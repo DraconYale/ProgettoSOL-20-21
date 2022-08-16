@@ -287,9 +287,8 @@ int storageOpenFile(storage* storage, char* filename, int flags, int client){
 	return 0;
 }
 
-long storageReadFile(storage* storage, char* filename, void** sentCont, int client){
+long storageReadFile(storage* storage, char* filename, void** sentCont, long** sentSize, int client){
 	
-	long bytesSent;
 	if(storage == NULL || filename == NULL){
 		errno = EINVAL;
 		return 0;
@@ -326,18 +325,20 @@ long storageReadFile(storage* storage, char* filename, void** sentCont, int clie
 	}
 	if(readF->clientLocker == -1 || readF->clientLocker == client){
 		if(readF->size == 0){
-			*sentCont = "";
+			*sentCont = NULL;
+			*sentSize = readF->size;
+			return 0;
 		}
 		else{
 			if((*sentCont = malloc(readF->size)) == NULL){
 				return -2;
 			}
 			memcpy(*sentCont, readF->content, readF->size);
-			bytesSent = readF->size;
+			*sentSize = readF->size;
 			if(readUnlock(readF->mux) != 0){
 				return -2;
 			}
-			return bytesSent;
+			return 0;
 		}
 	
 	}

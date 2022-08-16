@@ -76,11 +76,11 @@ int openFile(const char* pathname, int flags){
 	char* tmpbuf = calloc(MAXLEN, sizeof(char));
 	//request will be parsed by server
 	snprintf(tmpbuf, MAXLEN, "%s %s %d", OPEN, pathname, flags);
-	if(write(csfd, (void *)tmpbuf, MAXLEN) == -1){
+	if(writen(csfd, (void *)tmpbuf, MAXLEN) == -1){
 		return -1;
 	}
 	char ret;
-	if(read(csfd, (void*)ret, 1) == -1){
+	if(readn(csfd, (void*)ret, 1) == -1){
 		return -1;
 	}
 	int retCode = (int) ret;
@@ -102,7 +102,7 @@ int readFile(const char* pathname, void** buf, size_t* size){
 	}
 	char* tmpbuf = calloc(MAXLEN, sizeof(char));
 	//request will be parsed by server
-	snprintf(tmpbuf, MAXLEN, "%s %s %d", READ, buf, size);
+	snprintf(tmpbuf, MAXLEN, "%s %s", READ, pathname);
 	if(writen(csfd, (void *)tmpbuf, MAXLEN) == -1){
 		return -1;
 	}
@@ -130,11 +130,11 @@ int readNFiles(int N, const char* dirname){
 	char* tmpbuf = calloc(MAXLEN, sizeof(char));
 	//request will be parsed by server
 	snprintf(tmpbuf, MAXLEN, "%s %d", READN, N);
-	if(write(csfd, (void *)tmpbuf, MAXLEN) == -1){
+	if(writen(csfd, (void *)tmpbuf, MAXLEN) == -1){
 		return -1;
 	}
 	char ret;
-	if(read(csfd, (void*)ret, 1) == -1){
+	if(readn(csfd, (void*)ret, 1) == -1){
 		return -1;
 	}
 	int retCode = (int) ret;

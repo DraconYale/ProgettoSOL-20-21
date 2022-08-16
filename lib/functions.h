@@ -2,6 +2,9 @@
 #define FUNCTIONS_H_DEFINED
 #define <unistd.h>
 
+#define O_CREATE 1
+#define O_LOCK 2
+
 ssize_t  /* Read "n" bytes from a descriptor */
 readn(int fd, void *ptr, size_t n) {  
    size_t   nleft;

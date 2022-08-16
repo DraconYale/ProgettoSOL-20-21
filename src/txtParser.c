@@ -10,6 +10,7 @@
 #define STORAGEB "Storage Size = "
 #define STORAGEF "Storage File Number = "
 #define SOCKET "Path To Socket = "
+#define REPOLICY "Replacement policy = "
 
 #define MAX_SOCKET_LENGHT 256
 #define BUFFERSIZE 1024
@@ -19,6 +20,7 @@ struct txtFile{
 	long storageSize;			//storage size in bytes
 	long storageFileNumber;			//max file number in storage
 	char* pathToSocket;
+	long repPolicy;
 }
 
 
@@ -94,6 +96,19 @@ int applyConfig(txtFile* conf, const char* pathToConfig){
 		if(strncmp(buf, SOCKET, strlen(SOCKET)) == 0){
 			strncpy(conf->pathToSocket, buf+strlen(SOCKET), MAX_SOCKET_LENGHT); 		
 			break;
+		}
+		if(strncmp(buf, REPOLICY, strlen(REPOLICY)) == 0){
+			value = strtol(buf + strlen(REPOLICY), NULL, 10); 				//strtol of value, base 10
+			//strtol may set errno for underflow or overflow!
+			if(errno == ERANGE){
+				cleanconf(config);
+				errno = EINVAL;								//invalid value, sets errno = EINVAL
+				return -1;
+			}
+			else{
+				conf->repPolicy = value;
+				break;
+			}
 		}
 	}
 	if(fclose(config) != 0){									//fclose sets errno

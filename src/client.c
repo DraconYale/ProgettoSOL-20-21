@@ -31,10 +31,12 @@
 
 
 long isNumber(const char* s) {
-   char* e = NULL;
-   long val = strtol(s, &e, 0);
-   if (e != NULL && *e == (char)0) return val; 
-   return -1;
+	char* e = NULL;
+	long val = strtol(s, &e, 0);
+	if (e != NULL && *e == (char)0){
+		return val;
+	} 
+	return -1;
 }
 
 //validator checks if str is an option. Returns 0 if str is equal to one of the options

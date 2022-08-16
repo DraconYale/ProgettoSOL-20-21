@@ -106,6 +106,7 @@ int dequeueBuffer(boundedBuffer* buf, char** retjob){
 		perror("Couldn't unlock");
 		return -1;
 	}
+	return 0;
 }
 
 int cleanBuffer(boundedBuffer* buf){

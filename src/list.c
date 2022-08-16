@@ -192,6 +192,22 @@ elem* nextList(list* list, elem* elem){
 	}
 }
 
+
+int elemsNumber(list* list){
+	if (list == NULL){
+		errno = EINVAL;
+		return -1;
+	}
+	elem* current = list->head;
+	int count = 0;
+	while(current != NULL){
+		count++;
+		current = current->next;
+	}
+	return count;
+}
+
+
 void freeList(list* list){
     	elem* tmp;
 	elem* curr = list->head;

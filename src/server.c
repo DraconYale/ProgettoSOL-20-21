@@ -344,6 +344,88 @@ void* workFunc(void* args){
 				if(writen(pOut, (void*) pOut, BUFFERSIZE) == -1);
 				break;			
 			}
+			//APPEND
+			if(strncmp(operation, "APPEND", 6) == 0){
+				listOfFiles = NULL;
+				writeContent = NULL;
+				token = strtok_r(NULL, " ", &strtokState);
+				memset(pathname, 0, REQUESTLEN);
+				sscanf(token, "%s", pathname);
+				token = strtok_r(NULL, " ", &strtokState);
+				sscanf(token, "%l", writeSize);
+				if(writeSize != 0){
+					if((writeContent = malloc(writeSize * sizeof(char))) == NULL{
+						return -1
+					} 
+					memset(writeContent, 0, writeSize+1);
+					if(readn(fd_ready, (void*) writeContent, writeSize)) <= 0){
+						return -1;		
+					}
+				
+				}
+				err = storageAppendFile(storage, pathname, writeFileContent, writeSize, &listOfFiles, fd_client);
+				free(writeContents);
+				memset(returnStr, 0, 32);
+				snprintf(returnStr, 32, "%d", err);
+				if((writen(fd_client, (void*) returnStr, strlen(returnStr) + 1)) <= 0){
+					return -1;
+				}
+				//log
+				switch(err){
+					case 0: 
+						break;
+					
+					case -1:
+						memset(errorString, 0, 32);
+						snprintf(errorString, 32, "%d", errno);
+						if(writen(fd_client, (void*) errorString, 32) == -1){
+							return -1;
+						}
+						break;
+						
+					case -2				
+						memset(errorString, 0, 32);
+						snprintf(errorString, 32, "%d", errno);
+						if(writen(fd_client, (void*) errorString, 32) == -1){
+							return -1;
+						}
+						return -1;
+				
+				}
+				memset(sizeStr, 0, BUFFERSIZE);
+				snprintf(sizeStr, BUFFERSIZE, "%d", elemsNumber(listOfFiles));
+				if((writen(fd_client, (void*) sizeStr, BUFFERSIZE)) <= 0){
+					return -1;
+				}
+				int j = elemsNumber(listOfFiles);
+				list* current = getHead(listOfFiles);
+				storedFile* tmp = current->info;
+				while(j > 0){
+					memset(retStr, 0, BUFFERSIZE);
+					snprintf(retStr, BUFFERSIZE, "%s", tmp->name);
+					if((writen(fd_client, (void*) retStr, BUFFERSIZE)) <= 0){
+						return -1;
+					}
+					memset(sizeStr, 0, BUFFERSIZE);
+					snprintf(sizeStr, BUFFERSIZE, "%l", tmp->size);
+					if((writen(fd_client, (void*) sizeStr, BUFFERSIZE)) <= 0){
+						return -1;
+					}
+					if((writen(fd_client, (void*) tmp->content, tmp->size)) <= 0){
+						return -1;
+					}
+					//log
+					current = current->next;
+					tmp = current->info;
+					j--;
+				
+				}
+				freeList(listOfElem);
+				memset(pOut, 0, BUFFERSIZE);
+				snprintf(pOut, BUFFERSIZE, "%d", fd_client);
+				if(writen(pOut, (void*) pOut, BUFFERSIZE) == -1);
+				break;			
+			}
 		}
 	
 	

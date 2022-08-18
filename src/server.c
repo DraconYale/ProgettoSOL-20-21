@@ -430,7 +430,7 @@ void* workFunc(void* args){
 						return -1;
 					}
 					break;
-					
+				//LOCK	
 				case LOCK:
 					token = strtok_r(NULL, " ", &strtokState);
 					memset(pathname, 0, REQUESTLEN);
@@ -469,7 +469,7 @@ void* workFunc(void* args){
 						return -1;
 					}
 					break;
-					
+				//UNLOCK	
 				case UNLOCK:
 					token = strtok_r(NULL, " ", &strtokState);
 					memset(pathname, 0, REQUESTLEN);
@@ -508,7 +508,7 @@ void* workFunc(void* args){
 						return -1;
 					}
 					break;
-					
+				//CLOSE	
 				case CLOSE: 
 					memset(pathname, 0, UNIX_PATH_MAX);
 					token = strtok_r(NULL, " ", &strtokState);
@@ -549,7 +549,50 @@ void* workFunc(void* args){
 					if(writen(pOut, (void*) pOut, BUFFERSIZE) == -1){
 						return -1;
 					}
-					break;				
+					break;
+				//REMOVE	
+				case REMOVE: 
+					memset(pathname, 0, UNIX_PATH_MAX);
+					token = strtok_r(NULL, " ", &strtokState);
+					pathname = token;
+					flags = 0;
+					token = strtok_r(NULL, " ", &strtokState);
+					sscanf(token, "%d", &flags);
+					err = storageCloseFile(storage, pathname, flags, fd_client);
+					memset(returnStr, 0, 32);
+					snprintf(returnStr, 32, "%d", err);
+					if((writen(fd_client, (void*) returnStr, strlen(returnStr) + 1)) <= 0){
+						return -1;
+					}
+					//log
+					switch(err){
+						case 0: 
+							break;
+						
+						case -1:
+							memset(errorString, 0, 32);
+							snprintf(errorString, 32, "%d", errno);
+							if(writen(fd_client, (void *)errorString, 32) == -1){
+								return -1;
+							}
+							break;
+							
+						case -2				
+							memset(errorString, 0, 32);
+							snprintf(errorString, 32, "%d", errno);
+							if(writen(fd_client, (void *)errorString, 32) == -1){
+								return -1;
+							}
+							return -1;
+					
+					}
+					memset(pOut, 0, BUFFERSIZE);
+					snprintf(pOut, BUFFERSIZE, "%d", fd_client);
+					if(writen(pOut, (void*) pOut, BUFFERSIZE) == -1){
+						return -1;
+					}
+					break;
+										
 			}
 			free(fdString);
 	}

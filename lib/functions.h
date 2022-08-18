@@ -5,6 +5,19 @@
 #define O_CREATE 1
 #define O_LOCK 2
 
+//opcodes
+typedef enum operations{
+	OPEN,
+	CLOSE,
+	READ,
+	READN,
+	WRITE,
+	APPEND,
+	LOCK,
+	UNLOCK,
+	REMOVE
+} operation;
+
 ssize_t  /* Read "n" bytes from a descriptor */
 readn(int fd, void *ptr, size_t n) {  
    size_t   nleft;

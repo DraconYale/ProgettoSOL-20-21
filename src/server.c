@@ -63,6 +63,7 @@ void* workFunc(void* args){
 	boundedBuffer* commands = arguments->commands;
 	int pOut = arguments->pipeOut;
 	FILE* logFile = arguments->log;
+	operation op;
 	char* fdString;
 	int fd_client;
 	char* returnStr;
@@ -98,358 +99,344 @@ void* workFunc(void* args){
 		if(readn(fd_ready, (void*) command, COMMLENGTH)) <= 0){
 			return -1;		
 		}
-		tokComm = command;
 		token = strtok_r(tokComm, " ", &strtokState);
 		if(token != NULL){
-			operation = token;
-			//OPEN
-			if(strncmp(operation, "OPEN", 4) == 0){
-				memset(pathname, 0, UNIX_PATH_MAX);
-				token = strtok_r(NULL, " ", &strtokState);
-				pathname = token;
-				flags = 0;
-				token = strtok_r(NULL, " ", &strtokState);
-				sscanf(token, "%d", &flags);
-				err = storageOpenFile(storage, pathname, flags, fd_client);
-				memset(returnStr, 0, 32);
-				snprintf(returnStr, 32, "%d", err);
-				if((writen(fd_client, (void*) returnStr, strlen(returnStr) + 1)) <= 0){
-					return -1;
-				}
-				//log
-				switch(err){
-					case 0: 
-						break;
-					
-					case -1:
-						memset(errorString, 0, 32);
-						snprintf(errorString, 32, "%d", errno);
-						if(writen(fd_client, (void *)errorString, 32) == -1){
-							return -1;
-						}
-						break;
-						
-					case -2				
-						memset(errorString, 0, 32);
-						snprintf(errorString, 32, "%d", errno);
-						if(writen(fd_client, (void *)errorString, 32) == -1){
-							return -1;
-						}
-						return -1;
-				
-				}
-				memset(pOut, 0, BUFFERSIZE);
-				snprintf(pOut, BUFFERSIZE, "%d", fd_client);
-				if(writen(pOut, (void*) pOut, BUFFERSIZE) == -1);
-				break;			
-			}
-			//READ
-			if(strncmp(operation, "READ", 4) == 0){
-				sentBuf = NULL;
-				sentSize = 0;
-				memset(pathname, 0, UNIX_PATH_MAX);
-				token = strtok_r(NULL, " ", &strtokState);
-				pathname = token;
-				err = storageReadFile(storage, pathname, &sentBuf, &sentSize, fd_client);
-				memset(returnStr, 0, 32);
-				snprintf(returnStr, 32, "%d", err);
-				if((writen(fd_client, (void*) returnStr, strlen(returnStr) + 1)) <= 0){
-					return -1;
-				}
-				//log
-				switch(err){
-					case 0: 
-						break;
-					
-					case -1:
-						memset(errorString, 0, 32);
-						snprintf(errorString, 32, "%d", errno);
-						if(writen(fd_client, (void*) errorString, 32) == -1){
-							return -1;
-						}
-						break;
-						
-					case -2				
-						memset(errorString, 0, 32);
-						snprintf(errorString, 32, "%d", errno);
-						if(writen(fd_client, (void*) errorString, 32) == -1){
-							return -1;
-						}
-						return -1;
-				
-				}
-				memset(sizeStr, 0, BUFFERSIZE);
-				snprintf(sizeStr, BUFFERSIZE, "%l", sentSize);
-				if((writen(fd_client, (void*) sizeStr, BUFFERSIZE)) <= 0){
-					return -1;
-				}
-				if((writen(fd_client, (void*) sentBuf, sentSize) <= 0){
-					return -1;
-				}
-				free(sentBuf);
-				memset(pOut, 0, BUFFERSIZE);
-				snprintf(pOut, BUFFERSIZE, "%d", fd_client);
-				if(writen(pOut, (void*) pOut, BUFFERSIZE) == -1);
-				break;			
-			}
-			//READN
-			if(strncmp(operation, "READN", 5) == 0){
-				listOfFiles = NULL;
-				N = 0;
-				token = strtok_r(NULL, " ", &strtokState);
-				sscanf(token, "%d", &N);
-				err = storageReadNFile(storage, N, &listOfFiles, fd_client);
-				memset(returnStr, 0, 32);
-				snprintf(returnStr, 32, "%d", err);
-				if((writen(fd_client, (void*) returnStr, strlen(returnStr) + 1)) <= 0){
-					return -1;
-				}
-				//log
-				switch(err){
-					case 0: 
-						break;
-					
-					case -1:
-						memset(errorString, 0, 32);
-						snprintf(errorString, 32, "%d", errno);
-						if(writen(fd_client, (void*) errorString, 32) == -1){
-							return -1;
-						}
-						break;
-						
-					case -2				
-						memset(errorString, 0, 32);
-						snprintf(errorString, 32, "%d", errno);
-						if(writen(fd_client, (void*) errorString, 32) == -1){
-							return -1;
-						}
-						return -1;
-				
-				}
-				memset(sizeStr, 0, BUFFERSIZE);
-				snprintf(sizeStr, BUFFERSIZE, "%d", elemsNumber(listOfFiles));
-				if((writen(fd_client, (void*) sizeStr, BUFFERSIZE)) <= 0){
-					return -1;
-				}
-				int j = elemsNumber(listOfFiles);
-				list* current = getHead(listOfFiles);
-				storedFile* tmp = current->info;
-				readSize = 0;
-				while(j > 0){
-					readSize = readSize + tmp->size;
-					memset(retStr, 0, BUFFERSIZE);
-					snprintf(retStr, BUFFERSIZE, "%s", tmp->name);
-					if((writen(fd_client, (void*) retStr, BUFFERSIZE)) <= 0){
-						return -1;
-					}
-					memset(sizeStr, 0, BUFFERSIZE);
-					snprintf(sizeStr, BUFFERSIZE, "%l", tmp->size);
-					if((writen(fd_client, (void*) sizeStr, BUFFERSIZE)) <= 0){
-						return -1;
-					}
-					if((writen(fd_client, (void*) tmp->content, tmp->size)) <= 0){
-						return -1;
-					}
-					current = current->next;
-					tmp = current->info;
-					j--;
-				
-				}
-				freeList(listOfElem);
-				//log
-				memset(pOut, 0, BUFFERSIZE);
-				snprintf(pOut, BUFFERSIZE, "%d", fd_client);
-				if(writen(pOut, (void*) pOut, BUFFERSIZE) == -1);
-				break;			
-			}
-			//WRITE
-			if(strncmp(operation, "WRITE", 5) == 0){
-				listOfFiles = NULL;
-				writeContent = NULL;
-				token = strtok_r(NULL, " ", &strtokState);
-				memset(pathname, 0, REQUESTLEN);
-				sscanf(token, "%s", pathname);
-				token = strtok_r(NULL, " ", &strtokState);
-				sscanf(token, "%l", writeSize);
-				if(writeSize != 0){
-					if((writeContent = malloc(writeSize * sizeof(char))) == NULL{
-						return -1
-					} 
-					memset(writeContent, 0, writeSize+1);
-					if(readn(fd_ready, (void*) writeContent, writeSize)) <= 0){
-						return -1;		
-					}
-				
-				}
-				err = storageWriteFile(storage, pathname, writeFileContent, writeSize, &listOfFiles, fd_client);
-				free(writeContents);
-				memset(returnStr, 0, 32);
-				snprintf(returnStr, 32, "%d", err);
-				if((writen(fd_client, (void*) returnStr, strlen(returnStr) + 1)) <= 0){
-					return -1;
-				}
-				//log
-				switch(err){
-					case 0: 
-						break;
-					
-					case -1:
-						memset(errorString, 0, 32);
-						snprintf(errorString, 32, "%d", errno);
-						if(writen(fd_client, (void*) errorString, 32) == -1){
-							return -1;
-						}
-						break;
-						
-					case -2				
-						memset(errorString, 0, 32);
-						snprintf(errorString, 32, "%d", errno);
-						if(writen(fd_client, (void*) errorString, 32) == -1){
-							return -1;
-						}
-						return -1;
-				
-				}
-				memset(sizeStr, 0, BUFFERSIZE);
-				snprintf(sizeStr, BUFFERSIZE, "%d", elemsNumber(listOfFiles));
-				if((writen(fd_client, (void*) sizeStr, BUFFERSIZE)) <= 0){
-					return -1;
-				}
-				int j = elemsNumber(listOfFiles);
-				list* current = getHead(listOfFiles);
-				storedFile* tmp = current->info;
-				while(j > 0){
-					memset(retStr, 0, BUFFERSIZE);
-					snprintf(retStr, BUFFERSIZE, "%s", tmp->name);
-					if((writen(fd_client, (void*) retStr, BUFFERSIZE)) <= 0){
-						return -1;
-					}
-					memset(sizeStr, 0, BUFFERSIZE);
-					snprintf(sizeStr, BUFFERSIZE, "%l", tmp->size);
-					if((writen(fd_client, (void*) sizeStr, BUFFERSIZE)) <= 0){
-						return -1;
-					}
-					if((writen(fd_client, (void*) tmp->content, tmp->size)) <= 0){
+			sscanf(token, "%d", &op);
+			
+			switch(op){
+			
+				//OPEN
+				case OPEN: 
+					memset(pathname, 0, UNIX_PATH_MAX);
+					token = strtok_r(NULL, " ", &strtokState);
+					pathname = token;
+					flags = 0;
+					token = strtok_r(NULL, " ", &strtokState);
+					sscanf(token, "%d", &flags);
+					err = storageOpenFile(storage, pathname, flags, fd_client);
+					memset(returnStr, 0, 32);
+					snprintf(returnStr, 32, "%d", err);
+					if((writen(fd_client, (void*) returnStr, strlen(returnStr) + 1)) <= 0){
 						return -1;
 					}
 					//log
-					current = current->next;
-					tmp = current->info;
-					j--;
-				
-				}
-				freeList(listOfElem);
-				memset(pOut, 0, BUFFERSIZE);
-				snprintf(pOut, BUFFERSIZE, "%d", fd_client);
-				if(writen(pOut, (void*) pOut, BUFFERSIZE) == -1);
-				break;			
-			}
-			//APPEND
-			if(strncmp(operation, "APPEND", 6) == 0){
-				listOfFiles = NULL;
-				writeContent = NULL;
-				token = strtok_r(NULL, " ", &strtokState);
-				memset(pathname, 0, REQUESTLEN);
-				sscanf(token, "%s", pathname);
-				token = strtok_r(NULL, " ", &strtokState);
-				sscanf(token, "%l", writeSize);
-				if(writeSize != 0){
-					if((writeContent = malloc(writeSize * sizeof(char))) == NULL{
-						return -1
-					} 
-					memset(writeContent, 0, writeSize+1);
-					if(readn(fd_ready, (void*) writeContent, writeSize)) <= 0){
-						return -1;		
-					}
-				
-				}
-				err = storageAppendFile(storage, pathname, writeFileContent, writeSize, &listOfFiles, fd_client);
-				free(writeContents);
-				memset(returnStr, 0, 32);
-				snprintf(returnStr, 32, "%d", err);
-				if((writen(fd_client, (void*) returnStr, strlen(returnStr) + 1)) <= 0){
-					return -1;
-				}
-				//log
-				switch(err){
-					case 0: 
-						break;
-					
-					case -1:
-						memset(errorString, 0, 32);
-						snprintf(errorString, 32, "%d", errno);
-						if(writen(fd_client, (void*) errorString, 32) == -1){
-							return -1;
-						}
-						break;
+					switch(err){
+						case 0: 
+							break;
 						
-					case -2				
-						memset(errorString, 0, 32);
-						snprintf(errorString, 32, "%d", errno);
-						if(writen(fd_client, (void*) errorString, 32) == -1){
+						case -1:
+							memset(errorString, 0, 32);
+							snprintf(errorString, 32, "%d", errno);
+							if(writen(fd_client, (void *)errorString, 32) == -1){
+								return -1;
+							}
+							break;
+							
+						case -2				
+							memset(errorString, 0, 32);
+							snprintf(errorString, 32, "%d", errno);
+							if(writen(fd_client, (void *)errorString, 32) == -1){
+								return -1;
+							}
 							return -1;
-						}
-						return -1;
+					
+					}
+					memset(pOut, 0, BUFFERSIZE);
+					snprintf(pOut, BUFFERSIZE, "%d", fd_client);
+					if(writen(pOut, (void*) pOut, BUFFERSIZE) == -1);
+					break;			
 				
-				}
-				memset(sizeStr, 0, BUFFERSIZE);
-				snprintf(sizeStr, BUFFERSIZE, "%d", elemsNumber(listOfFiles));
-				if((writen(fd_client, (void*) sizeStr, BUFFERSIZE)) <= 0){
-					return -1;
-				}
-				int j = elemsNumber(listOfFiles);
-				list* current = getHead(listOfFiles);
-				storedFile* tmp = current->info;
-				while(j > 0){
-					memset(retStr, 0, BUFFERSIZE);
-					snprintf(retStr, BUFFERSIZE, "%s", tmp->name);
-					if((writen(fd_client, (void*) retStr, BUFFERSIZE)) <= 0){
-						return -1;
-					}
-					memset(sizeStr, 0, BUFFERSIZE);
-					snprintf(sizeStr, BUFFERSIZE, "%l", tmp->size);
-					if((writen(fd_client, (void*) sizeStr, BUFFERSIZE)) <= 0){
-						return -1;
-					}
-					if((writen(fd_client, (void*) tmp->content, tmp->size)) <= 0){
+				//READ
+				case READ: 
+					sentBuf = NULL;
+					sentSize = 0;
+					memset(pathname, 0, UNIX_PATH_MAX);
+					token = strtok_r(NULL, " ", &strtokState);
+					pathname = token;
+					err = storageReadFile(storage, pathname, &sentBuf, &sentSize, fd_client);
+					memset(returnStr, 0, 32);
+					snprintf(returnStr, 32, "%d", err);
+					if((writen(fd_client, (void*) returnStr, strlen(returnStr) + 1)) <= 0){
 						return -1;
 					}
 					//log
-					current = current->next;
-					tmp = current->info;
-					j--;
-				
-				}
-				freeList(listOfElem);
-				memset(pOut, 0, BUFFERSIZE);
-				snprintf(pOut, BUFFERSIZE, "%d", fd_client);
-				if(writen(pOut, (void*) pOut, BUFFERSIZE) == -1);
-				break;			
+					switch(err){
+						case 0: 
+							break;
+						
+						case -1:
+							memset(errorString, 0, 32);
+							snprintf(errorString, 32, "%d", errno);
+							if(writen(fd_client, (void*) errorString, 32) == -1){
+								return -1;
+							}
+							break;
+							
+						case -2				
+							memset(errorString, 0, 32);
+							snprintf(errorString, 32, "%d", errno);
+							if(writen(fd_client, (void*) errorString, 32) == -1){
+								return -1;
+							}
+							return -1;
+					
+					}
+					memset(sizeStr, 0, BUFFERSIZE);
+					snprintf(sizeStr, BUFFERSIZE, "%l", sentSize);
+					if((writen(fd_client, (void*) sizeStr, BUFFERSIZE)) <= 0){
+						return -1;
+					}
+					if((writen(fd_client, (void*) sentBuf, sentSize) <= 0){
+						return -1;
+					}
+					free(sentBuf);
+					memset(pOut, 0, BUFFERSIZE);
+					snprintf(pOut, BUFFERSIZE, "%d", fd_client);
+					if(writen(pOut, (void*) pOut, BUFFERSIZE) == -1);
+					break;			
+					
+				//READN
+				case READN: 
+					listOfFiles = NULL;
+					N = 0;
+					token = strtok_r(NULL, " ", &strtokState);
+					sscanf(token, "%d", &N);
+					err = storageReadNFile(storage, N, &listOfFiles, fd_client);
+					memset(returnStr, 0, 32);
+					snprintf(returnStr, 32, "%d", err);
+					if((writen(fd_client, (void*) returnStr, strlen(returnStr) + 1)) <= 0){
+						return -1;
+					}
+					//log
+					switch(err){
+						case 0: 
+							break;
+						
+						case -1:
+							memset(errorString, 0, 32);
+							snprintf(errorString, 32, "%d", errno);
+							if(writen(fd_client, (void*) errorString, 32) == -1){
+								return -1;
+							}
+							break;
+							
+						case -2				
+							memset(errorString, 0, 32);
+							snprintf(errorString, 32, "%d", errno);
+							if(writen(fd_client, (void*) errorString, 32) == -1){
+								return -1;
+							}
+							return -1;
+					
+					}
+					memset(sizeStr, 0, BUFFERSIZE);
+					snprintf(sizeStr, BUFFERSIZE, "%d", elemsNumber(listOfFiles));
+					if((writen(fd_client, (void*) sizeStr, BUFFERSIZE)) <= 0){
+						return -1;
+					}
+					int j = elemsNumber(listOfFiles);
+					list* current = getHead(listOfFiles);
+					storedFile* tmp = current->info;
+					readSize = 0;
+					while(j > 0){
+						readSize = readSize + tmp->size;
+						memset(retStr, 0, BUFFERSIZE);
+						snprintf(retStr, BUFFERSIZE, "%s", tmp->name);
+						if((writen(fd_client, (void*) retStr, BUFFERSIZE)) <= 0){
+							return -1;
+						}
+						memset(sizeStr, 0, BUFFERSIZE);
+						snprintf(sizeStr, BUFFERSIZE, "%l", tmp->size);
+						if((writen(fd_client, (void*) sizeStr, BUFFERSIZE)) <= 0){
+							return -1;
+						}
+						if((writen(fd_client, (void*) tmp->content, tmp->size)) <= 0){
+							return -1;
+						}
+						current = current->next;
+						tmp = current->info;
+						j--;
+					
+					}
+					freeList(listOfElem);
+					//log
+					memset(pOut, 0, BUFFERSIZE);
+					snprintf(pOut, BUFFERSIZE, "%d", fd_client);
+					if(writen(pOut, (void*) pOut, BUFFERSIZE) == -1);
+					break;			
+					
+				//WRITE
+				case WRITE: 
+					listOfFiles = NULL;
+					writeContent = NULL;
+					token = strtok_r(NULL, " ", &strtokState);
+					memset(pathname, 0, REQUESTLEN);
+					sscanf(token, "%s", pathname);
+					token = strtok_r(NULL, " ", &strtokState);
+					sscanf(token, "%l", writeSize);
+					if(writeSize != 0){
+						if((writeContent = malloc(writeSize * sizeof(char))) == NULL{
+							return -1
+						} 
+						memset(writeContent, 0, writeSize+1);
+						if(readn(fd_ready, (void*) writeContent, writeSize)) <= 0){
+							return -1;		
+						}
+					
+					}
+					err = storageWriteFile(storage, pathname, writeFileContent, writeSize, &listOfFiles, fd_client);
+					free(writeContents);
+					memset(returnStr, 0, 32);
+					snprintf(returnStr, 32, "%d", err);
+					if((writen(fd_client, (void*) returnStr, strlen(returnStr) + 1)) <= 0){
+						return -1;
+					}
+					//log
+					switch(err){
+						case 0: 
+							break;
+						
+						case -1:
+							memset(errorString, 0, 32);
+							snprintf(errorString, 32, "%d", errno);
+							if(writen(fd_client, (void*) errorString, 32) == -1){
+								return -1;
+							}
+							break;
+							
+						case -2				
+							memset(errorString, 0, 32);
+							snprintf(errorString, 32, "%d", errno);
+							if(writen(fd_client, (void*) errorString, 32) == -1){
+								return -1;
+							}
+							return -1;
+					
+					}
+					memset(sizeStr, 0, BUFFERSIZE);
+					snprintf(sizeStr, BUFFERSIZE, "%d", elemsNumber(listOfFiles));
+					if((writen(fd_client, (void*) sizeStr, BUFFERSIZE)) <= 0){
+						return -1;
+					}
+					int j = elemsNumber(listOfFiles);
+					list* current = getHead(listOfFiles);
+					storedFile* tmp = current->info;
+					while(j > 0){
+						memset(retStr, 0, BUFFERSIZE);
+						snprintf(retStr, BUFFERSIZE, "%s", tmp->name);
+						if((writen(fd_client, (void*) retStr, BUFFERSIZE)) <= 0){
+							return -1;
+						}
+						memset(sizeStr, 0, BUFFERSIZE);
+						snprintf(sizeStr, BUFFERSIZE, "%l", tmp->size);
+						if((writen(fd_client, (void*) sizeStr, BUFFERSIZE)) <= 0){
+							return -1;
+						}
+						if((writen(fd_client, (void*) tmp->content, tmp->size)) <= 0){
+							return -1;
+						}
+						//log
+						current = current->next;
+						tmp = current->info;
+						j--;
+					
+					}
+					freeList(listOfElem);
+					memset(pOut, 0, BUFFERSIZE);
+					snprintf(pOut, BUFFERSIZE, "%d", fd_client);
+					if(writen(pOut, (void*) pOut, BUFFERSIZE) == -1);
+					break;			
+
+				//APPEND
+				case APPEND:
+					listOfFiles = NULL;
+					writeContent = NULL;
+					token = strtok_r(NULL, " ", &strtokState);
+					memset(pathname, 0, REQUESTLEN);
+					sscanf(token, "%s", pathname);
+					token = strtok_r(NULL, " ", &strtokState);
+					sscanf(token, "%l", writeSize);
+					if(writeSize != 0){
+						if((writeContent = malloc(writeSize * sizeof(char))) == NULL{
+							return -1
+						} 
+						memset(writeContent, 0, writeSize+1);
+						if(readn(fd_ready, (void*) writeContent, writeSize)) <= 0){
+							return -1;		
+						}
+					
+					}
+					err = storageAppendFile(storage, pathname, writeFileContent, writeSize, &listOfFiles, fd_client);
+					free(writeContents);
+					memset(returnStr, 0, 32);
+					snprintf(returnStr, 32, "%d", err);
+					if((writen(fd_client, (void*) returnStr, strlen(returnStr) + 1)) <= 0){
+						return -1;
+					}
+					//log
+					switch(err){
+						case 0: 
+							break;
+						
+						case -1:
+							memset(errorString, 0, 32);
+							snprintf(errorString, 32, "%d", errno);
+							if(writen(fd_client, (void*) errorString, 32) == -1){
+								return -1;
+							}
+							break;
+							
+						case -2				
+							memset(errorString, 0, 32);
+							snprintf(errorString, 32, "%d", errno);
+							if(writen(fd_client, (void*) errorString, 32) == -1){
+								return -1;
+							}
+							return -1;
+					
+					}
+					memset(sizeStr, 0, BUFFERSIZE);
+					snprintf(sizeStr, BUFFERSIZE, "%d", elemsNumber(listOfFiles));
+					if((writen(fd_client, (void*) sizeStr, BUFFERSIZE)) <= 0){
+						return -1;
+					}
+					int j = elemsNumber(listOfFiles);
+					list* current = getHead(listOfFiles);
+					storedFile* tmp = current->info;
+					while(j > 0){
+						memset(retStr, 0, BUFFERSIZE);
+						snprintf(retStr, BUFFERSIZE, "%s", tmp->name);
+						if((writen(fd_client, (void*) retStr, BUFFERSIZE)) <= 0){
+							return -1;
+						}
+						memset(sizeStr, 0, BUFFERSIZE);
+						snprintf(sizeStr, BUFFERSIZE, "%l", tmp->size);
+						if((writen(fd_client, (void*) sizeStr, BUFFERSIZE)) <= 0){
+							return -1;
+						}
+						if((writen(fd_client, (void*) tmp->content, tmp->size)) <= 0){
+							return -1;
+						}
+						//log
+						current = current->next;
+						tmp = current->info;
+						j--;
+					
+					}
+					freeList(listOfElem);
+					memset(pOut, 0, BUFFERSIZE);
+					snprintf(pOut, BUFFERSIZE, "%d", fd_client);
+					if(writen(pOut, (void*) pOut, BUFFERSIZE) == -1);
+					break;			
 			}
 		}
-	
-	
-	
-	
-	
 	}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+	
+	
+	
+	
+	
+	
 
 
 

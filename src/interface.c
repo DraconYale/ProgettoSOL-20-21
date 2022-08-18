@@ -75,7 +75,7 @@ int openFile(const char* pathname, int flags){
 	}
 	char* tmpbuf = calloc(MAXLEN, sizeof(char));
 	//request will be parsed by server
-	snprintf(tmpbuf, MAXLEN, "%s %s %d", OPEN, pathname, flags);
+	snprintf(tmpbuf, MAXLEN, "%d %s %d", OPEN, pathname, flags);
 	if(writen(csfd, (void *)tmpbuf, MAXLEN) == -1){
 		return -1;
 	}
@@ -102,7 +102,7 @@ int readFile(const char* pathname, void** buf, size_t* size){
 	}
 	char* tmpbuf = calloc(MAXLEN, sizeof(char));
 	//request will be parsed by server
-	snprintf(tmpbuf, MAXLEN, "%s %s", READ, pathname);
+	snprintf(tmpbuf, MAXLEN, "%d %s", READ, pathname);
 	if(writen(csfd, (void *)tmpbuf, MAXLEN) == -1){
 		return -1;
 	}
@@ -129,7 +129,7 @@ int readNFiles(int N, const char* dirname){
 	}
 	char* tmpbuf = calloc(MAXLEN, sizeof(char));
 	//request will be parsed by server
-	snprintf(tmpbuf, MAXLEN, "%s %d", READN, N);
+	snprintf(tmpbuf, MAXLEN, "%d %d", READN, N);
 	if(writen(csfd, (void *)tmpbuf, MAXLEN) == -1){
 		return -1;
 	}

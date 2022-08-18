@@ -54,7 +54,6 @@ int nWrite = 0;
 int setDirRead = 0;
 int time = 0;
 int absTime = 5000;
-int setPrint = 0;
 int connected = 0;
 char* filename = NULL;
 
@@ -126,6 +125,7 @@ int main(int argc, char** argv){
 		return 1;
 	
 	}
+	setPrint = false;
 	int i = 1;
 	char* dirWrite = calloc(MAXLEN, sizeof(char));
 	char* dirRead = calloc(MAXLEN, sizeof(char));
@@ -177,9 +177,7 @@ int main(int argc, char** argv){
 				}
 			}
 			if((strncmp(tmp, "-p", 2)) == 0){
-				if(!setPrint){
-					setPrint = 1;
-				}
+				setPrint = true;
 			}
 		}
 		i++;

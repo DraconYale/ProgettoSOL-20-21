@@ -15,7 +15,7 @@
 
 #define BUFFERSIZE 256
 #define UNIX_PATH_MAX 108
-#define COMMLENGTH 32
+#define COMMLENGTH 1024
 
 typedef struct workArg{
 	storage* storage;
@@ -180,8 +180,10 @@ void* workFunc(void* args){
 					if((writen(fd_client, (void*) sizeStr, BUFFERSIZE)) <= 0){
 						return -1;
 					}
-					if((writen(fd_client, (void*) sentBuf, sentSize) <= 0){
-						return -1;
+					if(sentSize != 0){
+						if((writen(fd_client, (void*) sentBuf, sentSize) <= 0){
+							return -1;
+						}
 					}
 					free(sentBuf);
 					memset(pOut, 0, BUFFERSIZE);
@@ -246,8 +248,10 @@ void* workFunc(void* args){
 						if((writen(fd_client, (void*) sizeStr, BUFFERSIZE)) <= 0){
 							return -1;
 						}
-						if((writen(fd_client, (void*) tmp->content, tmp->size)) <= 0){
-							return -1;
+						if(tmp->size != 0){
+							if((writen(fd_client, (void*) tmp->content, tmp->size)) <= 0){
+								return -1;
+							}
 						}
 						current = current->next;
 						tmp = current->info;

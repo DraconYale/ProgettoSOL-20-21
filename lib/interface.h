@@ -1,6 +1,8 @@
 #ifndef INTERFACE_H_DEFINED
 #define INTERFACE_H_DEFINED
 
+extern bool setPrint;
+
 int openConnection(const char* sockname, int msec, const struct timespec abstime);
 
 int closeConnection(const char* sockname);

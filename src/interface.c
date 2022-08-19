@@ -359,9 +359,11 @@ int readNFiles(int N, const char* dirname){
 	if(dirSet){
 		if(closedir(directory) != 0){
 			PRINT(setPrint, "readNFile %d %s: fail with error %d\n", N, dirname, errno);
+			return -1;
 		}
 	
 	}
+	free(tmpBuf);
 	PRINT(setPrint, "readNFile %d %s: OK. Read files: %d Read bytes: %l Written bytes: %l\n", N, dirname, readNumber , readBytes, writtenBytes);
 	return 0;
 }
@@ -551,9 +553,11 @@ int writeFile(const char* pathname, const char* dirname){
 	if(dirSet){
 		if(closedir(directory) != 0){
 			PRINT(setPrint, "writeFile %s %s: fail with error %d\n", pathname, dirname, errno);
+			return -1;
 		}
 	
 	}
+	free(tmpBuf);
 	PRINT(setPrint, "writeFile %s %s: OK. Victim files from server: %d Read bytes: %l Written bytes: %l\n", pathname, dirname, victimNumber , readBytes, writtenBytes);
 	return 0;
 }
@@ -707,9 +711,11 @@ int appendToFile(const char* pathname, void* buf, size_t size, const char* dirna
 	if(dirSet){
 		if(closedir(directory) != 0){
 			PRINT(setPrint, "appendToFile %s %s: fail with error %d\n", pathname, dirname, errno);
+			return -1;
 		}
 	
 	}
+	free(tmpBuf);
 	PRINT(setPrint, "appendToFile %s %s: OK. Victim files from server: %d Read bytes: %l Written bytes: %l\n", pathname, dirname, victimNumber , readBytes, writtenBytes);
 	return 0;
 }
@@ -721,7 +727,54 @@ lockFile: sets the O_LOCK flag for file 'pathname'. If 'pathname' was opened/cre
 	  Returns (0) if success, (-1) if failure and sets errno. 
 */
 int lockFile(const char* pathname){
-	//TODO
+	
+	if (pathname == NULL || strlen(pathname) > UNIX_PATH_MAX){
+		errno = EINVAL;
+		PRINT(setPrint, "lockFile %s: fail with error %d\n", pathname, errno);
+		return -1;
+	}
+	char* tmpbuf = calloc(COMMLENGTH, sizeof(char));
+	//request will be parsed by server
+	snprintf(tmpbuf, COMMLENGTH, "%d %s", LOCK, pathname);
+	if(writen(csfd, (void *)tmpbuf, COMMLENGTH) == -1){
+		PRINT(setPrint, "lockFile %s: fail with error %d\n", pathname, errno);
+		return -1;
+	}
+	
+	memset(retStr, 0, MAXLEN)
+	if(readn(csfd, (void*)retStr, 2) == -1){
+		PRINT(setPrint, "lockFile %s: fail with error %d\n", pathname, errno);
+		return -1;
+	}
+	
+	sscanf(retStr, "%d", &retCode);
+	memset(retStr, 0, MAXLEN);
+	switch(retCode){
+		
+		case 0:
+			break;
+		
+		case -1:
+			if (readn(csfd, (void*) retStr, 32) == -1){
+				PRINT(setPrint, "lockFile %s: fail with error %d\n", pathname, errno);
+				return -1;
+			}
+			sscanf(retStr, "%d", &error)
+			PRINT(setPrint, "lockFile %s: fail with error %d\n", pathname, errno);
+			return -1;
+		case -2:
+			if (readn(csfd, (void*) retStr, 32) == -1){
+				PRINT(setPrint, "lockFile %s: fail with error %d\n", pathname, errno);
+				return -1;
+			}
+			sscanf(retStr, "%d", &error)
+			PRINT(setPrint, "lockFile %s: fatal error %d\n", pathname, errno);
+			exit(EXIT_FAILURE);
+	
+	}
+	free(tmpBuf);
+	PRINT(setPrint, "lockFile %s: OK\n", pathname);
+	return 0;
 }
 
 /*

@@ -277,11 +277,11 @@ void* workFunc(void* args){
 					token = strtok_r(NULL, " ", &strtokState);
 					sscanf(token, "%l", writeSize);
 					if(writeSize != 0){
-						if((writeContent = malloc(writeSize * sizeof(char))) == NULL{
+						if((writeFileContent = malloc(writeSize * sizeof(char))) == NULL{
 							return -1
 						} 
 						memset(writeContent, 0, writeSize+1);
-						if(readn(fd_ready, (void*) writeContent, writeSize)) <= 0){
+						if(readn(fd_ready, (void*) writeFileContent, writeSize)) <= 0){
 							return -1;		
 						}
 					
@@ -343,7 +343,7 @@ void* workFunc(void* args){
 						j--;
 					
 					}
-					freeList(listOfElem);
+					freeList(listOfFiles);
 					memset(pOut, 0, BUFFERSIZE);
 					snprintf(pOut, BUFFERSIZE, "%d", fd_client);
 					if(writen(pOut, (void*) pOut, BUFFERSIZE) == -1){

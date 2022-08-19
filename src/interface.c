@@ -838,7 +838,54 @@ closeFile: close request of file 'pathname'.
 	   Returns (0) if success, (-1) if failure and sets errno.
 */
 int closeFile(const char* pathname){
-	//TODO
+	
+	if (pathname == NULL || strlen(pathname) > UNIX_PATH_MAX){
+		errno = EINVAL;
+		PRINT(setPrint, "closeFile %s: fail with error %d\n", pathname, errno);
+		return -1;
+	}
+	char* tmpbuf = calloc(COMMLENGTH, sizeof(char));
+	//request will be parsed by server
+	snprintf(tmpbuf, COMMLENGTH, "%d %s", CLOSE, pathname);
+	if(writen(csfd, (void *)tmpbuf, COMMLENGTH) == -1){
+		PRINT(setPrint, "closeFile %s: fail with error %d\n", pathname, errno);
+		return -1;
+	}
+	
+	memset(retStr, 0, MAXLEN)
+	if(readn(csfd, (void*)retStr, 2) == -1){
+		PRINT(setPrint, "closeFile %s: fail with error %d\n", pathname, errno);
+		return -1;
+	}
+	
+	sscanf(retStr, "%d", &retCode);
+	memset(retStr, 0, MAXLEN);
+	switch(retCode){
+		
+		case 0:
+			break;
+		
+		case -1:
+			if (readn(csfd, (void*) retStr, 32) == -1){
+				PRINT(setPrint, "closeFile %s: fail with error %d\n", pathname, errno);
+				return -1;
+			}
+			sscanf(retStr, "%d", &error)
+			PRINT(setPrint, "closeFile %s: fail with error %d\n", pathname, errno);
+			return -1;
+		case -2:
+			if (readn(csfd, (void*) retStr, 32) == -1){
+				PRINT(setPrint, "closeFile %s: fail with error %d\n", pathname, errno);
+				return -1;
+			}
+			sscanf(retStr, "%d", &error)
+			PRINT(setPrint, "closeFile %s: fatal error %d\n", pathname, errno);
+			exit(EXIT_FAILURE);
+	
+	}
+	free(tmpBuf);
+	PRINT(setPrint, "closeFile %s: OK\n", pathname);
+	return 0;
 }
 
 

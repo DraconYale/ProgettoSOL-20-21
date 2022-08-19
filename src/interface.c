@@ -782,7 +782,54 @@ unlockFile: resets the O_LOCK flag for file 'pathname'.
 	    Returns (0) if success (lock owner calls unlockFile), (-1) failure (unlockFile is called by another process) and sets errno.
 */
 int unlockFile(const char* pathname){
-	//TODO
+	
+	if (pathname == NULL || strlen(pathname) > UNIX_PATH_MAX){
+		errno = EINVAL;
+		PRINT(setPrint, "unlockFile %s: fail with error %d\n", pathname, errno);
+		return -1;
+	}
+	char* tmpbuf = calloc(COMMLENGTH, sizeof(char));
+	//request will be parsed by server
+	snprintf(tmpbuf, COMMLENGTH, "%d %s", UNLOCK, pathname);
+	if(writen(csfd, (void *)tmpbuf, COMMLENGTH) == -1){
+		PRINT(setPrint, "unlockFile %s: fail with error %d\n", pathname, errno);
+		return -1;
+	}
+	
+	memset(retStr, 0, MAXLEN)
+	if(readn(csfd, (void*)retStr, 2) == -1){
+		PRINT(setPrint, "unlockFile %s: fail with error %d\n", pathname, errno);
+		return -1;
+	}
+	
+	sscanf(retStr, "%d", &retCode);
+	memset(retStr, 0, MAXLEN);
+	switch(retCode){
+		
+		case 0:
+			break;
+		
+		case -1:
+			if (readn(csfd, (void*) retStr, 32) == -1){
+				PRINT(setPrint, "unlockFile %s: fail with error %d\n", pathname, errno);
+				return -1;
+			}
+			sscanf(retStr, "%d", &error)
+			PRINT(setPrint, "unlockFile %s: fail with error %d\n", pathname, errno);
+			return -1;
+		case -2:
+			if (readn(csfd, (void*) retStr, 32) == -1){
+				PRINT(setPrint, "unlockFile %s: fail with error %d\n", pathname, errno);
+				return -1;
+			}
+			sscanf(retStr, "%d", &error)
+			PRINT(setPrint, "unlockFile %s: fatal error %d\n", pathname, errno);
+			exit(EXIT_FAILURE);
+	
+	}
+	free(tmpBuf);
+	PRINT(setPrint, "unlockFile %s: OK\n", pathname);
+	return 0;
 }
 
 

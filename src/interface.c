@@ -276,7 +276,7 @@ int readNFiles(int N, const char* dirname){
 				return -1;
 			}
 			sscanf(retStr, "%d", &error)
-			PRINT(setPrint, "readNFile %d %s: fail with error %d\n", N, dirname, errno);
+			PRINT(setPrint, "readNFile %d %s: fail with error %d\n", N, dirname, error);
 			return -1;
 		case -2:
 			if (readn(csfd, (void*) retStr, 32) == -1){
@@ -284,7 +284,7 @@ int readNFiles(int N, const char* dirname){
 				return -1;
 			}
 			sscanf(retStr, "%d", &error)
-			PRINT(setPrint, "readNFile %d %s: fatal error %d\n", N, dirname, errno);
+			PRINT(setPrint, "readNFile %d %s: fatal error %d\n", N, dirname, error);
 			exit(EXIT_FAILURE);
 	
 	}
@@ -470,7 +470,7 @@ int writeFile(const char* pathname, const char* dirname){
 				return -1;
 			}
 			sscanf(retStr, "%d", &error)
-			PRINT(setPrint, "writeFile %s %s: fail with error %d\n", pathname, dirname, errno);
+			PRINT(setPrint, "writeFile %s %s: fail with error %d\n", pathname, dirname, error);
 			return -1;
 		case -2:
 			if (readn(csfd, (void*) retStr, 32) == -1){
@@ -478,7 +478,7 @@ int writeFile(const char* pathname, const char* dirname){
 				return -1;
 			}
 			sscanf(retStr, "%d", &error)
-			PRINT(setPrint, "writeFile %s %s: fatal error %d\n", pathname, dirname, errno);
+			PRINT(setPrint, "writeFile %s %s: fatal error %d\n", pathname, dirname, error);
 			exit(EXIT_FAILURE);
 	
 	}
@@ -628,7 +628,7 @@ int appendToFile(const char* pathname, void* buf, size_t size, const char* dirna
 				return -1;
 			}
 			sscanf(retStr, "%d", &error)
-			PRINT(setPrint, "appendToFile %s %s: fail with error %d\n", pathname, dirname, errno);
+			PRINT(setPrint, "appendToFile %s %s: fail with error %d\n", pathname, dirname, error);
 			return -1;
 		case -2:
 			if (readn(csfd, (void*) retStr, 32) == -1){
@@ -636,7 +636,7 @@ int appendToFile(const char* pathname, void* buf, size_t size, const char* dirna
 				return -1;
 			}
 			sscanf(retStr, "%d", &error)
-			PRINT(setPrint, "appendToFile %s %s: fatal error %d\n", pathname, dirname, errno);
+			PRINT(setPrint, "appendToFile %s %s: fatal error %d\n", pathname, dirname, error);
 			exit(EXIT_FAILURE);
 	
 	}
@@ -760,7 +760,7 @@ int lockFile(const char* pathname){
 				return -1;
 			}
 			sscanf(retStr, "%d", &error)
-			PRINT(setPrint, "lockFile %s: fail with error %d\n", pathname, errno);
+			PRINT(setPrint, "lockFile %s: fail with error %d\n", pathname, error);
 			return -1;
 		case -2:
 			if (readn(csfd, (void*) retStr, 32) == -1){
@@ -768,7 +768,7 @@ int lockFile(const char* pathname){
 				return -1;
 			}
 			sscanf(retStr, "%d", &error)
-			PRINT(setPrint, "lockFile %s: fatal error %d\n", pathname, errno);
+			PRINT(setPrint, "lockFile %s: fatal error %d\n", pathname, error);
 			exit(EXIT_FAILURE);
 	
 	}
@@ -815,7 +815,7 @@ int unlockFile(const char* pathname){
 				return -1;
 			}
 			sscanf(retStr, "%d", &error)
-			PRINT(setPrint, "unlockFile %s: fail with error %d\n", pathname, errno);
+			PRINT(setPrint, "unlockFile %s: fail with error %d\n", pathname, error);
 			return -1;
 		case -2:
 			if (readn(csfd, (void*) retStr, 32) == -1){
@@ -823,7 +823,7 @@ int unlockFile(const char* pathname){
 				return -1;
 			}
 			sscanf(retStr, "%d", &error)
-			PRINT(setPrint, "unlockFile %s: fatal error %d\n", pathname, errno);
+			PRINT(setPrint, "unlockFile %s: fatal error %d\n", pathname, error);
 			exit(EXIT_FAILURE);
 	
 	}
@@ -871,7 +871,7 @@ int closeFile(const char* pathname){
 				return -1;
 			}
 			sscanf(retStr, "%d", &error)
-			PRINT(setPrint, "closeFile %s: fail with error %d\n", pathname, errno);
+			PRINT(setPrint, "closeFile %s: fail with error %d\n", pathname, error);
 			return -1;
 		case -2:
 			if (readn(csfd, (void*) retStr, 32) == -1){
@@ -879,7 +879,7 @@ int closeFile(const char* pathname){
 				return -1;
 			}
 			sscanf(retStr, "%d", &error)
-			PRINT(setPrint, "closeFile %s: fatal error %d\n", pathname, errno);
+			PRINT(setPrint, "closeFile %s: fatal error %d\n", pathname, error);
 			exit(EXIT_FAILURE);
 	
 	}
@@ -894,5 +894,52 @@ removeFile: remove file 'pathname' from the server.
 	    Returns (0) if success, (-1) if failure (file is not locked or is locked by another process) and sets errno.
 */
 int removeFile(const char* pathname){
-	//TODO
+	
+	if (pathname == NULL || strlen(pathname) > UNIX_PATH_MAX){
+		errno = EINVAL;
+		PRINT(setPrint, "removeFile %s: fail with error %d\n", pathname, errno);
+		return -1;
+	}
+	char* tmpbuf = calloc(COMMLENGTH, sizeof(char));
+	//request will be parsed by server
+	snprintf(tmpbuf, COMMLENGTH, "%d %s", CLOSE, pathname);
+	if(writen(csfd, (void *)tmpbuf, COMMLENGTH) == -1){
+		PRINT(setPrint, "removeFile %s: fail with error %d\n", pathname, errno);
+		return -1;
+	}
+	
+	memset(retStr, 0, MAXLEN)
+	if(readn(csfd, (void*)retStr, 2) == -1){
+		PRINT(setPrint, "removeFile %s: fail with error %d\n", pathname, errno);
+		return -1;
+	}
+	
+	sscanf(retStr, "%d", &retCode);
+	memset(retStr, 0, MAXLEN);
+	switch(retCode){
+		
+		case 0:
+			break;
+		
+		case -1:
+			if (readn(csfd, (void*) retStr, 32) == -1){
+				PRINT(setPrint, "removeFile %s: fail with error %d\n", pathname, errno);
+				return -1;
+			}
+			sscanf(retStr, "%d", &error)
+			PRINT(setPrint, "removeFile %s: fail with error %d\n", pathname, error);
+			return -1;
+		case -2:
+			if (readn(csfd, (void*) retStr, 32) == -1){
+				PRINT(setPrint, "removeFile %s: fail with error %d\n", pathname, errno);
+				return -1;
+			}
+			sscanf(retStr, "%d", &error)
+			PRINT(setPrint, "removeFile %s: fatal error %d\n", pathname, error);
+			exit(EXIT_FAILURE);
+	
+	}
+	free(tmpBuf);
+	PRINT(setPrint, "removeFile %s: OK\n", pathname);
+	return 0;
 }

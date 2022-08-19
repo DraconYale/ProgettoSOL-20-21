@@ -25,7 +25,7 @@ int error;
 
 #define PRINT(cond, ...) \
 	if(cond){ \
-		fprintf(stdout, VA_ARGS); \
+		fprintf(stdout, __VA_ARGS__); \
 	}
 
 /*

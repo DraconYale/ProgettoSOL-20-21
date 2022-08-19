@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
+#include <math.h>
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <sys/select.h>
@@ -17,7 +18,20 @@
 #define UNIX_PATH_MAX 108
 #define COMMLENGTH 1024
 
+#define LOG(...){ \
+	if (pthread_mutex_lock(&mutexLog) != 0) { \
+		perror("mutexLog lock"); \
+		return -1; \
+	} \
+	fprintf(logFile, __VA_ARGS__); \
+	if (pthread_mutex_unlock(&mutexLog) != 0) { \
+		perror("mutexLog unlock"); \
+		return -1; \
+	} \
+}
+
 typedef struct workArg{
+	time_t initTime;
 	storage* storage;
 	boundedBuffer* commands;
 	int pipeOut;
@@ -51,6 +65,7 @@ void* workFunc(void* args){
 	
 	int err;
 	workArg* arguments = (workArg*) args;
+	time_t initTime = arguments->initTime;
 	storage* storage = arguments->storage;
 	boundedBuffer* commands = arguments->commands;
 	int pOut = arguments->pipeOut;
@@ -72,6 +87,8 @@ void* workFunc(void* args){
 	list** listOfFiles = NULL;
 	int N;
 	long writeSize;
+	time_t currTime = time(NULL);
+	double time = 0;
 	char* writeFileContent;
 	char* sizeStr[BUFFERSIZE];
 	char* strtokState = NULL;
@@ -111,7 +128,9 @@ void* workFunc(void* args){
 					if((writen(fd_client, (void*) returnStr, strlen(returnStr) + 1)) <= 0){
 						return -1;
 					}
-					//log
+					currTime = time(NULL);
+					time = fabs(difftime(initTime, currTime);
+					LOG("[%d] Thread %d: openFile %s %d exited with code: %d\n", (int) time, (int) pthread_self(), pathname, flags, err);
 					switch(err){
 						case 0: 
 							break;
@@ -153,7 +172,9 @@ void* workFunc(void* args){
 					if((writen(fd_client, (void*) returnStr, strlen(returnStr) + 1)) <= 0){
 						return -1;
 					}
-					//log
+					currTime = time(NULL);
+					time = fabs(difftime(initTime, currTime);
+					LOG("[%d] Thread %d: readFile %s exited with code: %d. Read size: %l\n", (int) time, (int) pthread_self(), pathname, err, sentSize);
 					switch(err){
 						case 0: 
 							break;
@@ -205,7 +226,9 @@ void* workFunc(void* args){
 					if((writen(fd_client, (void*) returnStr, strlen(returnStr) + 1)) <= 0){
 						return -1;
 					}
-					//log
+					currTime = time(NULL);
+					time = fabs(difftime(initTime, currTime);
+					LOG("[%d] Thread %d: readNFile %d exited with code: %d\n", (int) time, (int) pthread_self(), N, err);
 					switch(err){
 						case 0: 
 							break;
@@ -232,7 +255,8 @@ void* workFunc(void* args){
 					if((writen(fd_client, (void*) sizeStr, BUFFERSIZE)) <= 0){
 						return -1;
 					}
-					int j = elemsNumber(listOfFiles);
+					int nFiles = elemsNumber(listOfFiles);
+					int j = nFiles;
 					list* current = getHead(listOfFiles);
 					storedFile* tmp = current->info;
 					readSize = 0;
@@ -259,7 +283,9 @@ void* workFunc(void* args){
 					
 					}
 					freeList(listOfElem);
-					//log
+					currTime = time(NULL);
+					time = fabs(difftime(initTime, currTime);
+					LOG("[%d] Thread %d: readNFile :: Number of read files: %d. Read size: %l\n", (int) time, (int) pthread_self(), nFiles, readSize);
 					memset(pOut, 0, BUFFERSIZE);
 					snprintf(pOut, BUFFERSIZE, "%d", fd_client);
 					if(writen(pOut, (void*) pOut, BUFFERSIZE) == -1){
@@ -290,10 +316,12 @@ void* workFunc(void* args){
 					free(writeContents);
 					memset(returnStr, 0, 32);
 					snprintf(returnStr, 32, "%d", err);
+					currTime = time(NULL);
+					time = fabs(difftime(initTime, currTime);
+					LOG("[%d] Thread %d: writeFile %s exited with code: %d\n. Write size: %l\n", (int) time, (int) pthread_self(), pathname, err, writeSize);
 					if((writen(fd_client, (void*) returnStr, strlen(returnStr) + 1)) <= 0){
 						return -1;
 					}
-					//log
 					switch(err){
 						case 0: 
 							break;
@@ -337,7 +365,9 @@ void* workFunc(void* args){
 						if((writen(fd_client, (void*) tmp->content, tmp->size)) <= 0){
 							return -1;
 						}
-						//log
+						currTime = time(NULL);
+						time = fabs(difftime(initTime, currTime);
+						LOG("[%d] Thread %d: writeFile %s: a victim has been chosen. Victim name: %s Victim size: %l\n", (int) time, (int) pthread_self(), pathname, tmp->name, tmp->size);
 						current = current->next;
 						tmp = current->info;
 						j--;
@@ -374,10 +404,12 @@ void* workFunc(void* args){
 					free(writeContents);
 					memset(returnStr, 0, 32);
 					snprintf(returnStr, 32, "%d", err);
+					currTime = time(NULL);
+					time = fabs(difftime(initTime, currTime);
+					LOG("[%d] Thread %d: appendToFile %s exited with code: %d\n. Write size: %l\n", (int) time, (int) pthread_self(), pathname, err, writeSize);
 					if((writen(fd_client, (void*) returnStr, strlen(returnStr) + 1)) <= 0){
 						return -1;
 					}
-					//log
 					switch(err){
 						case 0: 
 							break;
@@ -421,7 +453,9 @@ void* workFunc(void* args){
 						if((writen(fd_client, (void*) tmp->content, tmp->size)) <= 0){
 							return -1;
 						}
-						//log
+						currTime = time(NULL);
+						time = fabs(difftime(initTime, currTime);
+						LOG("[%d] Thread %d: appendToFile %s: a victim has been chosen. Victim name: %s Victim size: %l\n", (int) time, (int) pthread_self(), pathname, tmp->name, tmp->size);
 						current = current->next;
 						tmp = current->info;
 						j--;
@@ -442,10 +476,12 @@ void* workFunc(void* args){
 					err = storageLockFile(storage, pathname, fd_client);
 					memset(returnStr, 0, 32);
 					snprintf(returnStr, 32, "%d", err);
+					currTime = time(NULL);
+					time = fabs(difftime(initTime, currTime);
+					LOG("[%d] Thread %d: lockFile %s exited with code: %d\n", (int) time, (int) pthread_self(), pathname, err);
 					if((writen(fd_client, (void*) returnStr, strlen(returnStr) + 1)) <= 0){
 						return -1;
 					}
-					//log
 					switch (err){
 						case 0: 
 							break;
@@ -481,10 +517,12 @@ void* workFunc(void* args){
 					err = storageUnlockFile(storage, pathname, fd_client);
 					memset(returnStr, 0, 32);
 					snprintf(returnStr, 32, "%d", err);
+					currTime = time(NULL);
+					time = fabs(difftime(initTime, currTime);
+					LOG("[%d] Thread %d: unlockFile %s exited with code: %d\n", (int) time, (int) pthread_self(), pathname, err);
 					if((writen(fd_client, (void*) returnStr, strlen(returnStr) + 1)) <= 0){
 						return -1;
 					}
-					//log
 					switch (err){
 						case 0: 
 							break;
@@ -523,10 +561,12 @@ void* workFunc(void* args){
 					err = storageCloseFile(storage, pathname, flags, fd_client);
 					memset(returnStr, 0, 32);
 					snprintf(returnStr, 32, "%d", err);
+					currTime = time(NULL);
+					time = fabs(difftime(initTime, currTime);
+					LOG("[%d] Thread %d: closeFile %s exited with code: %d\n", (int) time, (int) pthread_self(), pathname, err);
 					if((writen(fd_client, (void*) returnStr, strlen(returnStr) + 1)) <= 0){
 						return -1;
 					}
-					//log
 					switch(err){
 						case 0: 
 							break;
@@ -565,10 +605,12 @@ void* workFunc(void* args){
 					err = storageCloseFile(storage, pathname, flags, fd_client);
 					memset(returnStr, 0, 32);
 					snprintf(returnStr, 32, "%d", err);
+					currTime = time(NULL);
+					time = fabs(difftime(initTime, currTime);
+					LOG("[%d] Thread %d: removeFile %s exited with code: %d\n", (int) time, (int) pthread_self(), pathname, err);
 					if((writen(fd_client, (void*) returnStr, strlen(returnStr) + 1)) <= 0){
 						return -1;
 					}
-					//log
 					switch(err){
 						case 0: 
 							break;
@@ -610,6 +652,8 @@ int main (int argc, char** argv){
 		printf("Usage: ./server '/path/to/config'\n");
 		return 0;
 	}
+	time_t initTime = time(NULL);
+	time_t currTime = time(NULL);
 	int err;
 	
 	//signal handling
@@ -709,6 +753,7 @@ int main (int argc, char** argv){
 	
 	//starting threads (to be fully implemented) 
 	workArg* workArgs = malloc(sizeof(workArg));
+	workArgs->initTime = initTime;
 	workArgs->storage = storage;
 	workArgs->commands = jobQueue;
 	workArgs->pipeOut = pipeMW[1];
@@ -774,6 +819,9 @@ int main (int argc, char** argv){
 						if(fd_client > fd_num){
 							fd_num = fd_client;
 						}
+						currTime = time(NULL);
+						time = fabs(difftime(initTime, currTime);
+						LOG("[%d] Server: new connection from client %d", (int) time, fd_client);
 					}
 					else{
 						perror("accept");
@@ -783,15 +831,16 @@ int main (int argc, char** argv){
 				
 				//pipe notifies that a request has been satisfied
 				if(i == pipeMW[0]){
-				
 					if(readn(i, (void*) re_fd, sizeof(int)) <= 0){
-						printf("Errore pipe\n");
+						printf("Pipe error\n");
 						return -1;
 					}
 					FD_SET(re_fd, &managerReadSet);
 					if(re_fd > fd_num){
 						fd_num = re_fd,
 					}
+					
+					
 				
 				}
 				//new request

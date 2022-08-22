@@ -75,7 +75,7 @@ int writeRecDir(char* dirname, char* dirMiss) {
 		while((errno=0, elem =readdir(dir)) != NULL && nWrite != 0) {
 			int parentL = strlen(nomedir);
 			int elemL = strlen(file->d_name);
-			if ((parentL+elemL+2)>MAX_PATH) {
+			if ((parentL+elemL+2)>UNIX_PATH_MAX) {
 				errno = ENAMETOOLONG;	//ENAMETOOLONG 36 Nome del file troppo lungo (from "errno -l")
 				perror("readdir");
 				return -1;
@@ -357,6 +357,7 @@ int main(int argc, char** argv){
 							free(files);
 							break;
 						}
+						fclose(dest);
 		    			}
 		    			r++;
 		    		}
@@ -520,6 +521,16 @@ int main(int argc, char** argv){
 		    		break;
 		    	}
         	}
-   	 }
+	}
+	if(dirWrite != NULL){
+		free(dirWrite);
+	}
+	if(dirRead != NULL){
+		free(dirRead);
+	}
+	if(closeConnection(socket) != 0){
+		perror("closeConnection");
+		return -1;
+	}
 	return 0;
 }

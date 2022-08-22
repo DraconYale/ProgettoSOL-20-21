@@ -55,7 +55,6 @@ void* signalHandling(void* set){
 			}	
 		
 		}
-	
 	}
 
 
@@ -638,6 +637,16 @@ void* workFunc(void* args){
 						return -1;
 					}
 					break;
+					
+				//CLOSECONN
+				case CLOSECONN:
+					memset(pOut, 0, BUFFERSIZE);
+					snprintf(pOut, BUFFERSIZE, "%d", -1);
+					if(writen(pOut, (void*) pOut, BUFFERSIZE) == -1){
+						return -1;
+					}
+					break;
+					
 										
 			}
 			free(fdString);
@@ -790,11 +799,11 @@ int main (int argc, char** argv){
 	
 		//SIGINT or SIGQUIT
 		if(term){
-			//TODO
+			goto cleanall
 		}
 		//SIGHUP
 		if(blockNewClients && clientsOnline == 0){
-			//TODO
+			goto cleanall
 		}
 		
 		setCopy = readManagerSet;
@@ -802,8 +811,8 @@ int main (int argc, char** argv){
 	
 		if((select(fd_num+1, &setCopy, NULL, NULL, &timeCopy)) == -1){
 		
-			//TODO
-		
+			perror("select")
+			goto cleanall
 		
 		}
 		i = 0;
@@ -827,21 +836,33 @@ int main (int argc, char** argv){
 						perror("accept");
 						return -1;
 					}
+					
 				}
 				
 				//pipe notifies that a request has been satisfied
 				if(i == pipeMW[0]){
+				
 					if(readn(i, (void*) re_fd, sizeof(int)) <= 0){
 						printf("Pipe error\n");
 						return -1;
 					}
-					FD_SET(re_fd, &managerReadSet);
-					if(re_fd > fd_num){
-						fd_num = re_fd,
+					if(re_fd == -1){
+						clientsOnline--;
+						currTime = time(NULL);
+						time = fabs(difftime(initTime, currTime);
+						LOG("[%d] Server: client disconnected", (int) time);
+						if(clientsOnline == 0 && blockNewClients){
+							goto cleanall
+						}
+					
 					}
-					
-					
-				
+					else{
+						FD_SET(re_fd, &managerReadSet);
+						if(re_fd > fd_num){
+							fd_num = re_fd,
+						}
+					}
+									
 				}
 				//new request
 				else{
@@ -863,5 +884,47 @@ int main (int argc, char** argv){
 		
 		}
 	}
+	
+	
+	
+	
+	
+	cleanall:
+		int j = 0;
+		snprintf(command, COMMLENGTH, "%d", -1);
+		for (j = 0; j < config->workerNumber; j++){
+			if(BoundedBuffer_Enqueue(jobQueue, command) != 0){
+				perror("enqueue");
+				return -1;
+			}
+		}
+		for (j = 0; j < config->workerNumber; j++){
+			pthread_join(workerThreads[j], NULL);
+		}
+		pthread_join(sigHandler, NULL);
+		updateStorage(storage);
+		printf("==STORAGE INFO==\n")
+		printf("Max number of files stored: %d", storage->maxFileStored);
+		printf("Max megabytes stored: %l", (storage->maxMBStored)/1000000);
+		printf("Replacement algorithm sent %d victims", storage->victimNumb);
+		printf("Currently stored files:\n");
+		printList(storage->filesFIFOQueue);
+		LOG("Max megabytes stored: %l\n", (storage->maxMBStored)/1000000);
+		LOG("Max number of files stored: %d\n", Storage_GetReachedFiles(storage));
+		LOG("Replacement algorithm sent %d victims", storage->victimNumb);		
+		if(cleanConf(config) != 0){
+			perror("cleanConf");
+			return -1;
+		}
+		freeStorage(storage);
+		cleanBuffer(jobQueue);
+		free(workerThreads);
+		unlink(socket);
+		close(pipeMW[0]); 
+		close(pipeMW[1]);
+		close(fd_skt);
+		LOG("Server terminated successfully\n");
+		fclose(logFile);
+		
 	return 0;
 }

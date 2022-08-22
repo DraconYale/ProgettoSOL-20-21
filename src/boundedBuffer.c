@@ -1,13 +1,12 @@
 /*
 Bounded buffer used to create the job queue. It's implemented as a circular queue (this may change)
 */
-
-#include <boundedBuffer.h>
-
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
 #include <errno.h>
+
+#include <boundedBuffer.h>
 
 struct boundedBuffer{
 	size_t size;

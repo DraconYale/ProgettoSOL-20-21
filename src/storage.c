@@ -862,5 +862,6 @@ int freeStorage(storage* storage){
 	freeLock(storage->mux);
 	freeList(storage->listFIFOQueue);
 	free(storage);
+	return 0;
 }
 

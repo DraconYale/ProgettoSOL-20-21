@@ -78,10 +78,18 @@ int closeConnection(const char* sockname){
 		PRINT(setPrint, "closeConnection to %s: fail with error %d\n", sockname, errno);
 		return -1;
 	}
+	char* tmpbuf = calloc(COMMLENGTH, sizeof(char));
+	//request will be parsed by server
+	snprintf(tmpbuf, COMMLENGTH, "%d", CLOSECONN);
+	if(writen(csfd, (void *)tmpbuf, COMMLENGTH) == -1){
+		PRINT(setPrint, "openFile %s: fail with error %d\n", pathname, errno);
+		return -1;
+	}
 	if (close(csfd) != 0){
 		PRINT(setPrint, "closeConnection to %s: fail with error %d\n", sockname, errno);
 		return -1;
 	}
+	free(tmpbuf);
 	PRINT(setPrint, "closeConnection to %s: OK\n", sockname);
 	return 0;
 }

@@ -15,7 +15,8 @@ typedef enum operations{
 	APPEND,
 	LOCK,
 	UNLOCK,
-	REMOVE
+	REMOVE,
+	CLOSECONN
 } operation;
 
 ssize_t  /* Read "n" bytes from a descriptor */

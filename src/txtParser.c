@@ -1,9 +1,9 @@
-#include <txtParser.h>
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+
+#include <txtParser.h>
 
 //define config file "format"
 #define WORKERS "Worker Number = "
@@ -119,9 +119,9 @@ int applyConfig(txtFile* conf, const char* pathToConfig){
 
 }
 
-int cleanconf(txtFile* conf){
+int cleanConf(txtFile* conf){
 	int err;
-	free(conf->socket);
+	free(conf->pathToSocket);
 	if((err = (fclose(conf))) != 0){			
 		return -1;
 	}

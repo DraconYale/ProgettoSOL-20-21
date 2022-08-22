@@ -11,6 +11,7 @@
 #define STORAGEF "Storage File Number = "
 #define SOCKET "Path To Socket = "
 #define REPOLICY "Replacement policy = "
+#define LOGFILE "Path to log file = "
 
 #define MAX_SOCKET_LENGHT 256
 #define BUFFERSIZE 1024
@@ -19,8 +20,9 @@ struct txtFile{
 	long workerNumber;			//worker threads number
 	long storageSize;			//storage size in bytes
 	long storageFileNumber;			//max file number in storage
-	char* pathToSocket;
-	long repPolicy;
+	char* pathToSocket;			//path to socket
+	long repPolicy;				//0 ==> FIFO 1 ==> LRU
+	char* logPath				//path to log file
 }
 
 
@@ -109,6 +111,10 @@ int applyConfig(txtFile* conf, const char* pathToConfig){
 				conf->repPolicy = value;
 				break;
 			}
+		}
+		
+		if(strncmp(buf, LOGFILE, strlen(LOGFILE)) == 0){
+			strncpy(conf->logPath, buf+strlen(LOGFILE), BUFFERSIZE);
 		}
 	}
 	if(fclose(config) != 0){									//fclose sets errno

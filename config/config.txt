@@ -1,4 +1,4 @@
-//server configuration file
+//Server configuration file
 
 //Number of worker threads
 Worker Number = 
@@ -11,3 +11,9 @@ Storage File Number =
 
 //Path to socket used by server
 Path To Socket = 
+
+//0 for FIFO policy, 1 for LRU policy
+Replacement policy = 
+
+//Path to log (used for generating different logs)
+Path to log file = 

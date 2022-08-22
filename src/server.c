@@ -10,6 +10,7 @@
 #include <signal.h>
 
 #include <boundedBuffer.h>
+#include <list.h>
 #include <txtParser.h>
 #include <functions.h>
 #include <storage.h>
@@ -755,7 +756,7 @@ int main (int argc, char** argv){
 	
 	FILE* logFile = NULL;
 	pthread_mutex_t mutexLog = PTHREAD_MUTEX_INITIALIZER;
-	if((logFile = fopen("./log.txt", w+)) == NULL){
+	if((logFile = fopen(config->logPath, w+)) == NULL){
 		perror("fopen");
 		return -1;
 	}

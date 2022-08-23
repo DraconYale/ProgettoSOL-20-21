@@ -1,24 +1,29 @@
+#define _GNU_SOURCE
+#include <time.h>
 #include <stdio.h>
-#include <stlib.h>
+#include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
+#include <stdbool.h>
 #include <errno.h>
 #include <dirent.h>
 #include <sys/socket.h>
-#include <sys/time.h>
+#include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/un.h>
+#include <unistd.h>
 
-#include <interface.h>
 #include <functions.h>
+#include <interface.h>
+
 
 #define MAXLEN 256
 #define UNIX_PATH_MAX 108
 #define COMMLENGTH 1024
 
-int csfd;							//client socket file descriptor
-char* cSockname = calloc(UNIX_PATH_MAX, sizeof(char));
+static int csfd;							//client socket file descriptor
+static char cSockname[UNIX_PATH_MAX];
 bool setPrint = false;
-char requestBuf[MAXLEN]
+char requestBuf[MAXLEN];
 char retString[MAXLEN];
 int retCode;
 int error;
@@ -47,13 +52,13 @@ int openConnection(const char* sockname, int msec, const struct timespec abstime
 	struct sockaddr_un sock_addr;
 	strncpy(sock_addr.sun_path, sockname, strlen(sockname) + 1);
 	sock_addr.sun_family = AF_UNIX;
-	while((connect(csfd, &sock_addr, sizeof(sock_addr))) == -1){
+	while((connect(csfd, (struct sockaddr*) &sock_addr, sizeof(sock_addr))) == -1){
 		if (errno != ENOENT){					//ENOENT 2 File o directory non esistente
 			PRINT(setPrint, "openConnection to %s: fail with error %d\n", sockname, errno);
 			return -1;
 		}
 		time_t current = time(NULL);				//current time
-		if (current > abstime->tv_sec){		
+		if (current > abstime.tv_sec){		
 			errno = EAGAIN;					//EAGAIN 11 Risorsa temporaneamente non disponibile
 			PRINT(setPrint, "openConnection to %s: fail with error %d\n", sockname, errno);		
 			return -1;
@@ -61,7 +66,7 @@ int openConnection(const char* sockname, int msec, const struct timespec abstime
 		sleep(msec); 
 		errno = 0;
 	}
-	strncpy(cSockname, sockname, UNIX_PATH_MAX);
+	strcpy(cSockname, sockname);
 	PRINT(setPrint, "openConnection to %s: OK\n", sockname);
 	return 0;
 }
@@ -78,18 +83,18 @@ int closeConnection(const char* sockname){
 		PRINT(setPrint, "closeConnection to %s: fail with error %d\n", sockname, errno);
 		return -1;
 	}
-	char* tmpbuf = calloc(COMMLENGTH, sizeof(char));
+	char* tmpBuf = calloc(COMMLENGTH, sizeof(char));
 	//request will be parsed by server
-	snprintf(tmpbuf, COMMLENGTH, "%d", CLOSECONN);
-	if(writen(csfd, (void *)tmpbuf, COMMLENGTH) == -1){
-		PRINT(setPrint, "openFile %s: fail with error %d\n", pathname, errno);
+	snprintf(tmpBuf, COMMLENGTH, "%d", CLOSECONN);
+	if(writen(csfd, (void *)tmpBuf, COMMLENGTH) == -1){
+		PRINT(setPrint, "openFile %s: fail with error %d\n", sockname, errno);
 		return -1;
 	}
 	if (close(csfd) != 0){
 		PRINT(setPrint, "closeConnection to %s: fail with error %d\n", sockname, errno);
 		return -1;
 	}
-	free(tmpbuf);
+	free(tmpBuf);
 	PRINT(setPrint, "closeConnection to %s: OK\n", sockname);
 	return 0;
 }
@@ -106,41 +111,41 @@ int openFile(const char* pathname, int flags){
 		PRINT(setPrint, "openFile %s: fail with error %d\n", pathname, errno);
 		return -1;
 	}
-	char* tmpbuf = calloc(COMMLENGTH, sizeof(char));
+	char* tmpBuf = calloc(COMMLENGTH, sizeof(char));
 	//request will be parsed by server
-	snprintf(tmpbuf, COMMLENGTH, "%d %s %d", OPEN, pathname, flags);
-	if(writen(csfd, (void *)tmpbuf, COMMLENGTH) == -1){
+	snprintf(tmpBuf, COMMLENGTH, "%d %s %d", OPEN, pathname, flags);
+	if(writen(csfd, (void *)tmpBuf, COMMLENGTH) == -1){
 		PRINT(setPrint, "openFile %s: fail with error %d\n", pathname, errno);
 		return -1;
 	}
 	
-	memset(retStr, 0, MAXLEN)
-	if(readn(csfd, (void*)retStr, 2) == -1){
+	memset(retString, 0, MAXLEN);
+	if(readn(csfd, (void*)retString, 2) == -1){
 		PRINT(setPrint, "openFile %s: fail with error %d\n", pathname, errno);
 		return -1;
 	}
 	
-	sscanf(retStr, "%d", &retCode);
-	memset(retStr, 0, MAXLEN);
+	sscanf(retString, "%d", &retCode);
+	memset(retString, 0, MAXLEN);
 	switch(retCode){
 		
 		case 0:
 			break;
 		
 		case -1:
-			if (readn(csfd, (void*) retStr, 32) == -1){
+			if (readn(csfd, (void*) retString, 32) == -1){
 				PRINT(setPrint, "openFile %s: fail with error %d\n", pathname, errno);
 				return -1;
 			}
-			sscanf(retStr, "%d", &error)
+			sscanf(retString, "%d", &error);
 			PRINT(setPrint, "openFile %s: fail with error %d\n", pathname, error);
 			return -1;
 		case -2:
-			if (readn(csfd, (void*) retStr, 32) == -1){
+			if (readn(csfd, (void*) retString, 32) == -1){
 				PRINT(setPrint, "openFile %s: fail with error %d\n", pathname, errno);
 				return -1;
 			}
-			sscanf(retStr, "%d", &error)
+			sscanf(retString, "%d", &error);
 			PRINT(setPrint, "openFile %s: fatal error %d\n", pathname, error);
 			exit(EXIT_FAILURE);
 	
@@ -158,58 +163,58 @@ readFile: reads all the contents in file 'pathname' and returns a pointer to hea
 */
 int readFile(const char* pathname, void** buf, size_t* size){
 
-	if(pathname == NULL || buf == NULL || size > MAXLEN){
+	if(pathname == NULL || buf == NULL){
 		errno = EINVAL;
 		PRINT(setPrint, "readFile %s: fail with error %d\n", pathname, errno);
 		return -1;
 	}
-	char* tmpbuf = calloc(COMMLENGTH, sizeof(char));
+	char* tmpBuf = calloc(COMMLENGTH, sizeof(char));
 	//request will be parsed by server
-	snprintf(tmpbuf, COMMLENGTH, "%d %s", READ, pathname);
-	if(writen(csfd, (void *)tmpbuf, COMMLENGTH) == -1){
+	snprintf(tmpBuf, COMMLENGTH, "%d %s", READ, pathname);
+	if(writen(csfd, (void *)tmpBuf, COMMLENGTH) == -1){
 		PRINT(setPrint, "readFile %s: fail with error %d\n", pathname, errno);
 		return -1;
 	}
-	memset(retStr, 0, MAXLEN)
-	if(readn(csfd, (void*)retStr, 2) == -1){
+	memset(retString, 0, MAXLEN);
+	if(readn(csfd, (void*)retString, 2) == -1){
 		PRINT(setPrint, "readFile %s: fail with error %d\n", pathname, errno);
 		return -1;
 	}
 	
-	sscanf(retStr, "%d", &retCode);
-	memset(retStr, 0, MAXLEN);
+	sscanf(retString, "%d", &retCode);
+	memset(retString, 0, MAXLEN);
 	switch(retCode){
 		
 		case 0:
 			break;
 		
 		case -1:
-			if (readn(csfd, (void*) retStr, 32) == -1){
+			if (readn(csfd, (void*) retString, 32) == -1){
 				PRINT(setPrint, "readFile %s: fail with error %d\n", pathname, errno);
 				return -1;
 			}
-			sscanf(retStr, "%d", &error)
+			sscanf(retString, "%d", &error);
 			PRINT(setPrint, "readFile %s: fail with error %d\n", pathname, error);
 			return -1;
 		case -2:
-			if (readn(csfd, (void*) retStr, 32) == -1){
+			if (readn(csfd, (void*) retString, 32) == -1){
 				PRINT(setPrint, "readFile %s: fail with error %d\n", pathname, errno);
 				return -1;
 			}
-			sscanf(retStr, "%d", &error)
+			sscanf(retString, "%d", &error);
 			PRINT(setPrint, "readFile %s: fatal error %d\n", pathname, error);
 			exit(EXIT_FAILURE);
 	
 	}
 	char* readBuf = NULL;
-	long sizeBuf = 0;
+	unsigned long sizeBuf = 0;
 	char msg[MAXLEN];			
 	memset(msg, 0, 32);
 	if(readn(csfd, (void*)msg, MAXLEN) == -1){
 		PRINT(setPrint, "readFile %s: fail with error %d\n", pathname, errno);
 		return -1;
 	}
-	sscanf(msg, "%l", &sizeBuf)
+	sscanf(msg, "%lu", &sizeBuf);
 	if(size != 0){
 		if((readBuf = calloc(sizeBuf+1, sizeof(char))) == NULL){
 			PRINT(setPrint, "readFile %s: fail with error %d\n", pathname, errno);
@@ -236,18 +241,17 @@ readNFiles: client request for N files. If server file count is <N or N<=0 then 
 */
 int readNFiles(int N, const char* dirname){
 
-	if(strlen(dirname) > UNIX_MAX_PATH){
+	if(strlen(dirname) > UNIX_PATH_MAX){
 		errno = EINVAL;
 		PRINT(setPrint, "readNFile %d %s: fail with error %d\n", N, dirname, errno);
 		return -1;
 	}
 	
-	long writtenBytes = 0;
-	long readBytes = 0;
-	int readFiles = 0;
+	unsigned long writtenBytes = 0;
+	unsigned long readBytes = 0;
 	DIR* directory = NULL;
 	bool dirSet = false;
-	char* tmpPath[UNIX_MAX_PATH] = NULL
+	char tmpPath[UNIX_PATH_MAX];
 	if(dirname != NULL){
 		if((directory = opendir(dirname)) == NULL){
 			dirSet = false;				//if opendir fails, read files will not be saved in dirname
@@ -258,55 +262,56 @@ int readNFiles(int N, const char* dirname){
 		}	
 	}
 	
-	char* tmpbuf = calloc(MAXLEN, sizeof(char));
+	char* tmpBuf = calloc(MAXLEN, sizeof(char));
 	//request will be parsed by server
-	snprintf(tmpbuf, MAXLEN, "%d %d", READN, N);
-	if(writen(csfd, (void *)tmpbuf, MAXLEN) == -1){
+	snprintf(tmpBuf, MAXLEN, "%d %d", READN, N);
+	if(writen(csfd, (void *)tmpBuf, MAXLEN) == -1){
 		return -1;
 	}
-	memset(retStr, 0, MAXLEN)
-	if(readn(csfd, (void*)retStr, 2) == -1){
+	memset(retString, 0, MAXLEN);
+	if(readn(csfd, (void*)retString, 2) == -1){
 		PRINT(setPrint, "readNFile %d %s: fail with error %d\n", N, dirname, errno);
 		return -1;
 	}
 	
 	
-	sscanf(retStr, "%d", &retCode);
-	memset(retStr, 0, MAXLEN);
+	sscanf(retString, "%d", &retCode);
+	memset(retString, 0, MAXLEN);
 	switch(retCode){
 		
 		case 0:
 			break;
 		
 		case -1:
-			if (readn(csfd, (void*) retStr, 32) == -1){
+			if (readn(csfd, (void*) retString, 32) == -1){
 				PRINT(setPrint, "readNFile %d %s: fail with error %d\n", N, dirname, errno);
 				return -1;
 			}
-			sscanf(retStr, "%d", &error)
+			sscanf(retString, "%d", &error);
 			PRINT(setPrint, "readNFile %d %s: fail with error %d\n", N, dirname, error);
 			return -1;
 		case -2:
-			if (readn(csfd, (void*) retStr, 32) == -1){
+			if (readn(csfd, (void*) retString, 32) == -1){
 				PRINT(setPrint, "readNFile %d %s: fail with error %d\n", N, dirname, errno);
 				return -1;
 			}
-			sscanf(retStr, "%d", &error)
+			sscanf(retString, "%d", &error);
 			PRINT(setPrint, "readNFile %d %s: fatal error %d\n", N, dirname, error);
 			exit(EXIT_FAILURE);
 	
 	}
-	char* readNumberStr[MAXLEN] = NULL;
+	char readNumberStr[MAXLEN];
+	memset(readNumberStr, 0, MAXLEN);
 	int readNumber = 0;
-	if (readn(csfd, (void*) readNumber, MAXLEN) == -1){
+	if (readn(csfd, (void*) readNumberStr, MAXLEN) == -1){
 		PRINT(setPrint, "readNFile %d %s: fail with error %d\n", N, dirname, errno);
 		return -1;
 	}
 	sscanf(readNumberStr, "%d", &readNumber);
 	int j = 0;
-	char name[MAXLEN] = NULL;
-	char msg[MAXLEN] = NULL;
-	long sizeBuf = 0;
+	char name[MAXLEN];
+	char msg[MAXLEN];
+	unsigned long sizeBuf = 0;
 	char* readCont = NULL;
 	while(j < readNumber){
 			memset(name, 0, MAXLEN);
@@ -319,13 +324,12 @@ int readNFiles(int N, const char* dirname){
 				PRINT(setPrint, "readNFile %d %s: fail with error %d\n", N, dirname, errno);
 				return -1;
 			}
-			sscanf(msg, "%l", sizeBuf);
+			sscanf(msg, "%lu", &sizeBuf);
 			if(sizeBuf != 0){
-				if((readCont = calloc(sizeBuf, sizeof(char)) == NULL){
+				if((readCont = calloc(sizeBuf, sizeof(char))) == NULL){
 					PRINT(setPrint, "readNFile %d %s: fail with error %d\n", N, dirname, errno);
 					return -1;
 				}
-			
 			
 			}
 			else{
@@ -333,16 +337,16 @@ int readNFiles(int N, const char* dirname){
 			}
 			readBytes = readBytes + sizeBuf;
 			if(dirSet){
-				if((strlen(dirname)+(strlen(name)) > UNIX_MAX_PATH)){
+				if((strlen(dirname)+(strlen(name)) > UNIX_PATH_MAX)){
 					errno = ENAMETOOLONG;
 					PRINT(setPrint, "readNFile %d %s: fail with error %d\n", N, dirname, errno);
 					return -1;
 				}
-				char* newPath[UNIX_MAX_PATH] = NULL;
+				char newPath[UNIX_PATH_MAX];
 				strcpy(newPath, tmpPath);
 				strncat(newPath, name, strlen(name)+1);
 				FILE* savedFile;
-				if((savedFile = fopen(newPath, w+)) == NULL){
+				if((savedFile = fopen(newPath, "w+")) == NULL){
 					PRINT(setPrint, "readNFile %d %s: fail with error %d\n", N, dirname, errno);
 					return -1;
 				}
@@ -359,8 +363,6 @@ int readNFiles(int N, const char* dirname){
 			free(readCont);
 			readCont = NULL;
 			sizeBuf = 0;
-			name = NULL;
-			msg = NULL;
 			j++;
 	
 	}
@@ -372,7 +374,7 @@ int readNFiles(int N, const char* dirname){
 	
 	}
 	free(tmpBuf);
-	PRINT(setPrint, "readNFile %d %s: OK. Read files: %d Read bytes: %l Written bytes: %l\n", N, dirname, readNumber , readBytes, writtenBytes);
+	PRINT(setPrint, "readNFile %d %s: OK. Read files: %d Read bytes: %lu Written bytes: %lu\n", N, dirname, readNumber , readBytes, writtenBytes);
 	return 0;
 }
 
@@ -385,17 +387,17 @@ writeFile: writes the 'pathname' file in the server. Server may expel one file t
 */
 int writeFile(const char* pathname, const char* dirname){
 
-	if(pathname == NULL || strlen(dirname) > UNIX_MAX_PATH){
+	if(pathname == NULL || strlen(dirname) > UNIX_PATH_MAX){
 		errno = EINVAL;
 		PRINT(setPrint, "writeFile %s %s: fail with error %d\n", pathname, dirname, errno);
 		return -1;
 	}
 	
-	long writtenBytes = 0;
-	long readBytes = 0;
+	unsigned long writtenBytes = 0;
+	unsigned long readBytes = 0;
 	DIR* directory = NULL;
 	bool dirSet = false;
-	char* tmpPath[UNIX_MAX_PATH] = NULL
+	char tmpPath[UNIX_PATH_MAX];
 	if(dirname != NULL){
 		if((directory = opendir(dirname)) == NULL){
 			dirSet = false;				//if opendir fails, read files will not be saved in dirname
@@ -407,7 +409,7 @@ int writeFile(const char* pathname, const char* dirname){
 	}
 	
 	//we need to calculate the file's size
-	long fileSize = 0;
+	unsigned long fileSize = 0;
 	FILE* file;
 	if((file  = fopen(pathname, "r")) == NULL){
 		PRINT(setPrint, "writeFile %s %s: fail with error %d\n", pathname, dirname, errno);
@@ -419,7 +421,7 @@ int writeFile(const char* pathname, const char* dirname){
 	}
 	
 	fileSize = ftell(file);
-	if (fseek(pathname_file, 0, SEEK_SET) != 0){
+	if (fseek(file, 0, SEEK_SET) != 0){
 		PRINT(setPrint, "writeFile %s %s: fail with error %d\n", pathname, dirname, errno);
 		return -1;
 	}
@@ -430,7 +432,7 @@ int writeFile(const char* pathname, const char* dirname){
 			fclose(file);
 			return -1;
 		}
-		long readSize; 
+		unsigned long readSize; 
 		if ((readSize = fread(fileContent, sizeof(char), fileSize, file)) != fileSize){
 			fclose(file);
 			free(fileContent);
@@ -441,11 +443,11 @@ int writeFile(const char* pathname, const char* dirname){
 	}
 	fclose(file);
 
-	char* tmpbuf = calloc(COMMLENGTH, sizeof(char));
+	char* tmpBuf = calloc(COMMLENGTH, sizeof(char));
 	
 	//request will be parsed by server
-	snprintf(tmpbuf, COMMLENGTH, "%d %s %l", WRITE, pathname, fileSize);
-	if(writen(csfd, (void *)tmpbuf, COMMLENGTH) == -1){
+	snprintf(tmpBuf, COMMLENGTH, "%d %s %lu", WRITE, pathname, fileSize);
+	if(writen(csfd, (void *)tmpBuf, COMMLENGTH) == -1){
 		PRINT(setPrint, "writeFile %s %s: fail with error %d\n", pathname, dirname, errno);
 		return -1;
 	}
@@ -459,50 +461,50 @@ int writeFile(const char* pathname, const char* dirname){
 		free(fileContent);
 	}
 	
-	memset(retStr, 0, MAXLEN)
-	if(readn(csfd, (void*)retStr, 2) == -1){
+	memset(retString, 0, MAXLEN);
+	if(readn(csfd, (void*)retString, 2) == -1){
 		PRINT(setPrint, "writeFile %s %s: fail with error %d\n", pathname, dirname, errno);
 		return -1;
 	}
 	
-	sscanf(retStr, "%d", &retCode);
-	memset(retStr, 0, MAXLEN);
+	sscanf(retString, "%d", &retCode);
+	memset(retString, 0, MAXLEN);
 	switch(retCode){
 		
 		case 0:
 			break;
 		
 		case -1:
-			if (readn(csfd, (void*) retStr, 32) == -1){
+			if (readn(csfd, (void*) retString, 32) == -1){
 				PRINT(setPrint, "writeFile %s %s: fail with error %d\n", pathname, dirname, errno);
 				return -1;
 			}
-			sscanf(retStr, "%d", &error)
+			sscanf(retString, "%d", &error);
 			PRINT(setPrint, "writeFile %s %s: fail with error %d\n", pathname, dirname, error);
 			return -1;
 		case -2:
-			if (readn(csfd, (void*) retStr, 32) == -1){
+			if (readn(csfd, (void*) retString, 32) == -1){
 				PRINT(setPrint, "writeFile %s %s: fail with error %d\n", pathname, dirname, errno);
 				return -1;
 			}
-			sscanf(retStr, "%d", &error)
+			sscanf(retString, "%d", &error);
 			PRINT(setPrint, "writeFile %s %s: fatal error %d\n", pathname, dirname, error);
 			exit(EXIT_FAILURE);
 	
 	}
-	char* readNumberStr[MAXLEN] = NULL;
+	char readNumberStr[MAXLEN];
 	int victimNumber = 0;
-	if (readn(csfd, (void*) victimNumber, MAXLEN) == -1){
+	if (readn(csfd, (void*) readNumberStr, MAXLEN) == -1){
 		PRINT(setPrint, "writeFile %s %s: fail with error %d\n", pathname, dirname, errno);
 		return -1;
 	}
 	sscanf(readNumberStr, "%d", &victimNumber);
 	int j = 0;
-	char name[MAXLEN] = NULL;
-	char msg[MAXLEN] = NULL;
-	long sizeBuf = 0;
+	char name[MAXLEN];
+	char msg[MAXLEN];
+	unsigned long sizeBuf = 0;
 	char* readCont = NULL;
-	while(j < readNumber){
+	while(j < victimNumber){
 			memset(name, 0, MAXLEN);
 			if (readn(csfd, (void*) name, MAXLEN) == -1){
 				PRINT(setPrint, "writeFile %s %s: fail with error %d\n", pathname, dirname, errno);
@@ -513,9 +515,9 @@ int writeFile(const char* pathname, const char* dirname){
 				PRINT(setPrint, "writeFile %s %s: fail with error %d\n", pathname, dirname, errno);
 				return -1;
 			}
-			sscanf(msg, "%l", sizeBuf);
+			sscanf(msg, "%lu", &sizeBuf);
 			if(sizeBuf != 0){
-				if((readCont = calloc(sizeBuf, sizeof(char)) == NULL){
+				if((readCont = calloc(sizeBuf, sizeof(char))) == NULL){
 					PRINT(setPrint, "writeFile %s %s: fail with error %d\n", pathname, dirname, errno);
 					return -1;
 				}
@@ -527,16 +529,16 @@ int writeFile(const char* pathname, const char* dirname){
 			}
 			readBytes = readBytes + sizeBuf;
 			if(dirSet){
-				if((strlen(dirname)+(strlen(name)) > UNIX_MAX_PATH)){
+				if((strlen(dirname)+(strlen(name)) > UNIX_PATH_MAX)){
 					errno = ENAMETOOLONG;
 					PRINT(setPrint, "writeFile %s %s: fail with error %d\n", pathname, dirname, errno);
 					return -1;
 				}
-				char* newPath[UNIX_MAX_PATH] = NULL;
+				char newPath[UNIX_PATH_MAX];
 				strcpy(newPath, tmpPath);
 				strncat(newPath, name, strlen(name)+1);
 				FILE* savedFile;
-				if((savedFile = fopen(newPath, w+)) == NULL){
+				if((savedFile = fopen(newPath, "w+")) == NULL){
 					PRINT(setPrint, "writeFile %s %s: fail with error %d\n", pathname, dirname, errno);
 					return -1;
 				}
@@ -553,8 +555,6 @@ int writeFile(const char* pathname, const char* dirname){
 			free(readCont);
 			readCont = NULL;
 			sizeBuf = 0;
-			name = NULL;
-			msg = NULL;
 			j++;
 	
 	}
@@ -566,7 +566,7 @@ int writeFile(const char* pathname, const char* dirname){
 	
 	}
 	free(tmpBuf);
-	PRINT(setPrint, "writeFile %s %s: OK. Victim files from server: %d Read bytes: %l Written bytes: %l\n", pathname, dirname, victimNumber , readBytes, writtenBytes);
+	PRINT(setPrint, "writeFile %s %s: OK. Victim files from server: %d Read bytes: %lu Written bytes: %lu\n", pathname, dirname, victimNumber , readBytes, writtenBytes);
 	return 0;
 }
 
@@ -578,17 +578,17 @@ appendToFile: append to 'pathname' 'size' bytes from buffer 'buf'. The append op
 */
 int appendToFile(const char* pathname, void* buf, size_t size, const char* dirname){
 	
-	if(pathname == NULL || strlen(dirname) > UNIX_MAX_PATH){
+	if(pathname == NULL || strlen(dirname) > UNIX_PATH_MAX){
 		errno = EINVAL;
 		PRINT(setPrint, "appendToFile %s %s: fail with error %d\n", pathname, dirname, errno);
 		return -1;
 	}
 	
-	long writtenBytes = 0;
-	long readBytes = 0;
+	unsigned long writtenBytes = 0;
+	unsigned long readBytes = 0;
 	DIR* directory = NULL;
 	bool dirSet = false;
-	char* tmpPath[UNIX_MAX_PATH] = NULL
+	char tmpPath[UNIX_PATH_MAX];
 	if(dirname != NULL){
 		if((directory = opendir(dirname)) == NULL){
 			dirSet = false;				//if opendir fails, read files will not be saved in dirname
@@ -599,11 +599,11 @@ int appendToFile(const char* pathname, void* buf, size_t size, const char* dirna
 		}	
 	}
 	
-	char* tmpbuf = calloc(COMMLENGTH, sizeof(char));
+	char* tmpBuf = calloc(COMMLENGTH, sizeof(char));
 	
 	//request will be parsed by server
-	snprintf(tmpbuf, COMMLENGTH, "%d %s %l", APPEND, pathname, size);
-	if(writen(csfd, (void *)tmpbuf, COMMLENGTH) == -1){
+	snprintf(tmpBuf, COMMLENGTH, "%d %s %lu", APPEND, pathname, size);
+	if(writen(csfd, (void *)tmpBuf, COMMLENGTH) == -1){
 		PRINT(setPrint, "appendToFile %s %s: fail with error %d\n", pathname, dirname, errno);
 		return -1;
 	}
@@ -611,56 +611,54 @@ int appendToFile(const char* pathname, void* buf, size_t size, const char* dirna
 	if (size != 0){
 		if (writen(csfd, (void*) buf, size) == -1){
 			PRINT(setPrint, "appendToFile %s %s: fail with error %d\n", pathname, dirname, errno);
-			free(fileContent);
 			return -1;
 		}
-		free(fileContent);
 	}
 	
-	memset(retStr, 0, MAXLEN)
-	if(readn(csfd, (void*)retStr, 2) == -1){
+	memset(retString, 0, MAXLEN);
+	if(readn(csfd, (void*)retString, 2) == -1){
 		PRINT(setPrint, "appendToFile %s %s: fail with error %d\n", pathname, dirname, errno);
 		return -1;
 	}
 	
-	sscanf(retStr, "%d", &retCode);
-	memset(retStr, 0, MAXLEN);
+	sscanf(retString, "%d", &retCode);
+	memset(retString, 0, MAXLEN);
 	switch(retCode){
 		
 		case 0:
 			break;
 		
 		case -1:
-			if (readn(csfd, (void*) retStr, 32) == -1){
+			if (readn(csfd, (void*) retString, 32) == -1){
 				PRINT(setPrint, "appendToFile %s %s: fail with error %d\n", pathname, dirname, errno);
 				return -1;
 			}
-			sscanf(retStr, "%d", &error)
+			sscanf(retString, "%d", &error);
 			PRINT(setPrint, "appendToFile %s %s: fail with error %d\n", pathname, dirname, error);
 			return -1;
 		case -2:
-			if (readn(csfd, (void*) retStr, 32) == -1){
+			if (readn(csfd, (void*) retString, 32) == -1){
 				PRINT(setPrint, "appendToFile %s %s: fail with error %d\n", pathname, dirname, errno);
 				return -1;
 			}
-			sscanf(retStr, "%d", &error)
+			sscanf(retString, "%d", &error);
 			PRINT(setPrint, "appendToFile %s %s: fatal error %d\n", pathname, dirname, error);
 			exit(EXIT_FAILURE);
 	
 	}
-	char* readNumberStr[MAXLEN] = NULL;
+	char readNumberStr[MAXLEN];
 	int victimNumber = 0;
-	if (readn(csfd, (void*) victimNumber, MAXLEN) == -1){
+	if (readn(csfd, (void*) readNumberStr, MAXLEN) == -1){
 		PRINT(setPrint, "appendToFile %s %s: fail with error %d\n", pathname, dirname, errno);
 		return -1;
 	}
 	sscanf(readNumberStr, "%d", &victimNumber);
 	int j = 0;
-	char name[MAXLEN] = NULL;
-	char msg[MAXLEN] = NULL;
-	long sizeBuf = 0;
+	char name[MAXLEN];
+	char msg[MAXLEN];
+	unsigned long sizeBuf = 0;
 	char* readCont = NULL;
-	while(j < readNumber){
+	while(j < victimNumber){
 			memset(name, 0, MAXLEN);
 			if (readn(csfd, (void*) name, MAXLEN) == -1){
 				PRINT(setPrint, "appendToFile %s %s: fail with error %d\n", pathname, dirname, errno);
@@ -671,9 +669,9 @@ int appendToFile(const char* pathname, void* buf, size_t size, const char* dirna
 				PRINT(setPrint, "appendToFile %s %s: fail with error %d\n", pathname, dirname, errno);
 				return -1;
 			}
-			sscanf(msg, "%l", sizeBuf);
+			sscanf(msg, "%lu", &sizeBuf);
 			if(sizeBuf != 0){
-				if((readCont = calloc(sizeBuf, sizeof(char)) == NULL){
+				if((readCont = calloc(sizeBuf, sizeof(char))) == NULL){
 					PRINT(setPrint, "appendToFile %s %s: fail with error %d\n", pathname, dirname, errno);
 					return -1;
 				}
@@ -685,16 +683,16 @@ int appendToFile(const char* pathname, void* buf, size_t size, const char* dirna
 			}
 			readBytes = readBytes + sizeBuf;
 			if(dirSet){
-				if((strlen(dirname)+(strlen(name)) > UNIX_MAX_PATH)){
+				if((strlen(dirname)+(strlen(name)) > UNIX_PATH_MAX)){
 					errno = ENAMETOOLONG;
 					PRINT(setPrint, "appendToFile %s %s: fail with error %d\n", pathname, dirname, errno);
 					return -1;
 				}
-				char* newPath[UNIX_MAX_PATH] = NULL;
+				char newPath[UNIX_PATH_MAX];
 				strcpy(newPath, tmpPath);
 				strncat(newPath, name, strlen(name)+1);
 				FILE* savedFile;
-				if((savedFile = fopen(newPath, w+)) == NULL){
+				if((savedFile = fopen(newPath, "w+")) == NULL){
 					PRINT(setPrint, "appendToFile %s %s: fail with error %d\n", pathname, dirname, errno);
 					return -1;
 				}
@@ -711,8 +709,6 @@ int appendToFile(const char* pathname, void* buf, size_t size, const char* dirna
 			free(readCont);
 			readCont = NULL;
 			sizeBuf = 0;
-			name = NULL;
-			msg = NULL;
 			j++;
 	
 	}
@@ -724,7 +720,7 @@ int appendToFile(const char* pathname, void* buf, size_t size, const char* dirna
 	
 	}
 	free(tmpBuf);
-	PRINT(setPrint, "appendToFile %s %s: OK. Victim files from server: %d Read bytes: %l Written bytes: %l\n", pathname, dirname, victimNumber , readBytes, writtenBytes);
+	PRINT(setPrint, "appendToFile %s %s: OK. Victim files from server: %d Read bytes: %lu Written bytes: %lu\n", pathname, dirname, victimNumber , readBytes, writtenBytes);
 	return 0;
 }
 
@@ -741,41 +737,41 @@ int lockFile(const char* pathname){
 		PRINT(setPrint, "lockFile %s: fail with error %d\n", pathname, errno);
 		return -1;
 	}
-	char* tmpbuf = calloc(COMMLENGTH, sizeof(char));
+	char* tmpBuf = calloc(COMMLENGTH, sizeof(char));
 	//request will be parsed by server
-	snprintf(tmpbuf, COMMLENGTH, "%d %s", LOCK, pathname);
-	if(writen(csfd, (void *)tmpbuf, COMMLENGTH) == -1){
+	snprintf(tmpBuf, COMMLENGTH, "%d %s", LOCK, pathname);
+	if(writen(csfd, (void *)tmpBuf, COMMLENGTH) == -1){
 		PRINT(setPrint, "lockFile %s: fail with error %d\n", pathname, errno);
 		return -1;
 	}
 	
-	memset(retStr, 0, MAXLEN)
-	if(readn(csfd, (void*)retStr, 2) == -1){
+	memset(retString, 0, MAXLEN);
+	if(readn(csfd, (void*)retString, 2) == -1){
 		PRINT(setPrint, "lockFile %s: fail with error %d\n", pathname, errno);
 		return -1;
 	}
 	
-	sscanf(retStr, "%d", &retCode);
-	memset(retStr, 0, MAXLEN);
+	sscanf(retString, "%d", &retCode);
+	memset(retString, 0, MAXLEN);
 	switch(retCode){
 		
 		case 0:
 			break;
 		
 		case -1:
-			if (readn(csfd, (void*) retStr, 32) == -1){
+			if (readn(csfd, (void*) retString, 32) == -1){
 				PRINT(setPrint, "lockFile %s: fail with error %d\n", pathname, errno);
 				return -1;
 			}
-			sscanf(retStr, "%d", &error)
+			sscanf(retString, "%d", &error);
 			PRINT(setPrint, "lockFile %s: fail with error %d\n", pathname, error);
 			return -1;
 		case -2:
-			if (readn(csfd, (void*) retStr, 32) == -1){
+			if (readn(csfd, (void*) retString, 32) == -1){
 				PRINT(setPrint, "lockFile %s: fail with error %d\n", pathname, errno);
 				return -1;
 			}
-			sscanf(retStr, "%d", &error)
+			sscanf(retString, "%d", &error);
 			PRINT(setPrint, "lockFile %s: fatal error %d\n", pathname, error);
 			exit(EXIT_FAILURE);
 	
@@ -796,41 +792,41 @@ int unlockFile(const char* pathname){
 		PRINT(setPrint, "unlockFile %s: fail with error %d\n", pathname, errno);
 		return -1;
 	}
-	char* tmpbuf = calloc(COMMLENGTH, sizeof(char));
+	char* tmpBuf = calloc(COMMLENGTH, sizeof(char));
 	//request will be parsed by server
-	snprintf(tmpbuf, COMMLENGTH, "%d %s", UNLOCK, pathname);
-	if(writen(csfd, (void *)tmpbuf, COMMLENGTH) == -1){
+	snprintf(tmpBuf, COMMLENGTH, "%d %s", UNLOCK, pathname);
+	if(writen(csfd, (void *)tmpBuf, COMMLENGTH) == -1){
 		PRINT(setPrint, "unlockFile %s: fail with error %d\n", pathname, errno);
 		return -1;
 	}
 	
-	memset(retStr, 0, MAXLEN)
-	if(readn(csfd, (void*)retStr, 2) == -1){
+	memset(retString, 0, MAXLEN);
+	if(readn(csfd, (void*)retString, 2) == -1){
 		PRINT(setPrint, "unlockFile %s: fail with error %d\n", pathname, errno);
 		return -1;
 	}
 	
-	sscanf(retStr, "%d", &retCode);
-	memset(retStr, 0, MAXLEN);
+	sscanf(retString, "%d", &retCode);
+	memset(retString, 0, MAXLEN);
 	switch(retCode){
 		
 		case 0:
 			break;
 		
 		case -1:
-			if (readn(csfd, (void*) retStr, 32) == -1){
+			if (readn(csfd, (void*) retString, 32) == -1){
 				PRINT(setPrint, "unlockFile %s: fail with error %d\n", pathname, errno);
 				return -1;
 			}
-			sscanf(retStr, "%d", &error)
+			sscanf(retString, "%d", &error);
 			PRINT(setPrint, "unlockFile %s: fail with error %d\n", pathname, error);
 			return -1;
 		case -2:
-			if (readn(csfd, (void*) retStr, 32) == -1){
+			if (readn(csfd, (void*) retString, 32) == -1){
 				PRINT(setPrint, "unlockFile %s: fail with error %d\n", pathname, errno);
 				return -1;
 			}
-			sscanf(retStr, "%d", &error)
+			sscanf(retString, "%d", &error);
 			PRINT(setPrint, "unlockFile %s: fatal error %d\n", pathname, error);
 			exit(EXIT_FAILURE);
 	
@@ -852,41 +848,41 @@ int closeFile(const char* pathname){
 		PRINT(setPrint, "closeFile %s: fail with error %d\n", pathname, errno);
 		return -1;
 	}
-	char* tmpbuf = calloc(COMMLENGTH, sizeof(char));
+	char* tmpBuf = calloc(COMMLENGTH, sizeof(char));
 	//request will be parsed by server
-	snprintf(tmpbuf, COMMLENGTH, "%d %s", CLOSE, pathname);
-	if(writen(csfd, (void *)tmpbuf, COMMLENGTH) == -1){
+	snprintf(tmpBuf, COMMLENGTH, "%d %s", CLOSE, pathname);
+	if(writen(csfd, (void *)tmpBuf, COMMLENGTH) == -1){
 		PRINT(setPrint, "closeFile %s: fail with error %d\n", pathname, errno);
 		return -1;
 	}
 	
-	memset(retStr, 0, MAXLEN)
-	if(readn(csfd, (void*)retStr, 2) == -1){
+	memset(retString, 0, MAXLEN);
+	if(readn(csfd, (void*)retString, 2) == -1){
 		PRINT(setPrint, "closeFile %s: fail with error %d\n", pathname, errno);
 		return -1;
 	}
 	
-	sscanf(retStr, "%d", &retCode);
-	memset(retStr, 0, MAXLEN);
+	sscanf(retString, "%d", &retCode);
+	memset(retString, 0, MAXLEN);
 	switch(retCode){
 		
 		case 0:
 			break;
 		
 		case -1:
-			if (readn(csfd, (void*) retStr, 32) == -1){
+			if (readn(csfd, (void*) retString, 32) == -1){
 				PRINT(setPrint, "closeFile %s: fail with error %d\n", pathname, errno);
 				return -1;
 			}
-			sscanf(retStr, "%d", &error)
+			sscanf(retString, "%d", &error);
 			PRINT(setPrint, "closeFile %s: fail with error %d\n", pathname, error);
 			return -1;
 		case -2:
-			if (readn(csfd, (void*) retStr, 32) == -1){
+			if (readn(csfd, (void*) retString, 32) == -1){
 				PRINT(setPrint, "closeFile %s: fail with error %d\n", pathname, errno);
 				return -1;
 			}
-			sscanf(retStr, "%d", &error)
+			sscanf(retString, "%d", &error);
 			PRINT(setPrint, "closeFile %s: fatal error %d\n", pathname, error);
 			exit(EXIT_FAILURE);
 	
@@ -908,41 +904,41 @@ int removeFile(const char* pathname){
 		PRINT(setPrint, "removeFile %s: fail with error %d\n", pathname, errno);
 		return -1;
 	}
-	char* tmpbuf = calloc(COMMLENGTH, sizeof(char));
+	char* tmpBuf = calloc(COMMLENGTH, sizeof(char));
 	//request will be parsed by server
-	snprintf(tmpbuf, COMMLENGTH, "%d %s", CLOSE, pathname);
-	if(writen(csfd, (void *)tmpbuf, COMMLENGTH) == -1){
+	snprintf(tmpBuf, COMMLENGTH, "%d %s", CLOSE, pathname);
+	if(writen(csfd, (void *)tmpBuf, COMMLENGTH) == -1){
 		PRINT(setPrint, "removeFile %s: fail with error %d\n", pathname, errno);
 		return -1;
 	}
 	
-	memset(retStr, 0, MAXLEN)
-	if(readn(csfd, (void*)retStr, 2) == -1){
+	memset(retString, 0, MAXLEN);
+	if(readn(csfd, (void*)retString, 2) == -1){
 		PRINT(setPrint, "removeFile %s: fail with error %d\n", pathname, errno);
 		return -1;
 	}
 	
-	sscanf(retStr, "%d", &retCode);
-	memset(retStr, 0, MAXLEN);
+	sscanf(retString, "%d", &retCode);
+	memset(retString, 0, MAXLEN);
 	switch(retCode){
 		
 		case 0:
 			break;
 		
 		case -1:
-			if (readn(csfd, (void*) retStr, 32) == -1){
+			if (readn(csfd, (void*) retString, 32) == -1){
 				PRINT(setPrint, "removeFile %s: fail with error %d\n", pathname, errno);
 				return -1;
 			}
-			sscanf(retStr, "%d", &error)
+			sscanf(retString, "%d", &error);
 			PRINT(setPrint, "removeFile %s: fail with error %d\n", pathname, error);
 			return -1;
 		case -2:
-			if (readn(csfd, (void*) retStr, 32) == -1){
+			if (readn(csfd, (void*) retString, 32) == -1){
 				PRINT(setPrint, "removeFile %s: fail with error %d\n", pathname, errno);
 				return -1;
 			}
-			sscanf(retStr, "%d", &error)
+			sscanf(retString, "%d", &error);
 			PRINT(setPrint, "removeFile %s: fatal error %d\n", pathname, error);
 			exit(EXIT_FAILURE);
 	

@@ -1,30 +1,19 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
 
 #include <list.h>
 
-struct elem{
-	void* info;
-	struct elem* next;
-	struct elem* prev;
-}
-
-struct list{
-	elem* head;
-	elem* tail;
-	int elemNumber;
-}
-
-list initList(){
+list* initList(){
 
 	list* newList;
 	if((newList = malloc(sizeof(list))) == NULL){		//malloc sets errno = ENOMEM when fails
 		return NULL;
 	}
 	newList->head = NULL;
-	newlist->tail = NULL;
-	newlist->elemNumber = 0;
+	newList->tail = NULL;
+	newList->elemNumber = 0;
 	return newList;
 	
 }
@@ -54,9 +43,9 @@ void printList(list* list){
 		return;
 	}	
 	elem* tmp = list->head;
-	while(elem != NULL) {
-		printf("%s\n", (char*)elem->info);
-		elem = elem->next;
+	while(tmp != NULL) {
+		printf("%s\n", (char*)tmp->info);
+		tmp = tmp->next;
 	}
 
 }
@@ -98,7 +87,7 @@ elem* popHead(list* list){
 	elem* tmpElem = list->head;
 	list->head = list->head->next;
 	if(list->head != NULL){
-		list->head->prev = NULL
+		list->head->prev = NULL;
 	}
 	list->elemNumber--;
 
@@ -139,7 +128,7 @@ elem* popTail(list* list){
 
 int containsList(list* list, char* str){
 	
-	if (list == NULL || key == NULL || list->head == NULL){
+	if (list == NULL || str == NULL || list->head == NULL){
 		return 0;
 	}
 	elem* current = list->head;
@@ -211,9 +200,9 @@ int elemsNumber(list* list){
 void freeList(list* list){
     	elem* tmp;
 	elem* curr = list->head;
-	while(current != NULL){
-		tmp = current;
-		current = current->next;
+	while(curr != NULL){
+		tmp = curr;
+		curr = curr->next;
 		free(tmp);
 	}
 	free(list);

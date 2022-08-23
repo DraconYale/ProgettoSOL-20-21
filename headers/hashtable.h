@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <hash.h>
 #include <list.h>
 
 
@@ -18,8 +17,10 @@ hashTable* hashTableInit(int maxFiles);
 
 int hashInsert(hashTable* table, char* key, void* content);
 
-int hashRemove(hashTable* table, char* key);
+int hashRemove(hashTable* table, void* key);
 
 void* hashSearch(hashTable* table, char* key);
+
+int freeHash(hashTable* table);
 
 #endif

@@ -1,7 +1,8 @@
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
-#include <hash.h>
+#include <hashtable.h>
 #include <list.h>
 
 
@@ -9,13 +10,13 @@ struct hashItem{
 	char* key;
 	void* content;
 	struct hashItem* next;
-}
+};
 
 struct hashTable{
 	int tableSize;
 	int entriesNumber;
 	hashItem** items;
-}
+};
 
 //https://cp-algorithms.com/string/string-hashing.html
 int hashFunc(const char* s) {
@@ -23,7 +24,9 @@ int hashFunc(const char* s) {
 	const int m = 1e9 + 9;
 	int hashValue = 0;
 	int pPow = 1;
-	for (char c : s) {
+	int i;
+	for (i=0; s[i] != '\0'; i++) {
+		char c = s[i];
 		hashValue = (hashValue + (c - 'a' + 1) * pPow) % m;
 		pPow = (pPow * p) % m;
 	}
@@ -86,7 +89,7 @@ int hashRemove(hashTable* table, void* key){
 	hashItem* current = table->items[tmpHash];
 	hashItem* prev = NULL;
 	while(current != NULL){
-		if(strcmp(current->key, key) == 0){
+		if(strcmp(current->key, (char*) key) == 0){
 			if(prev == NULL){
 				table->items[tmpHash] = current->next;
 			}
@@ -123,12 +126,12 @@ void* hashSearch(hashTable* table, char* key){
 	return NULL;
 }
 
-int freeHash(hashtable* table){
+int freeHash(hashTable* table){
 	if(table == NULL){
 		return 0;
 	}
 	int i = 0;
-	for(i = 0, i < table->tablesize, i++){
+	for(i = 0; i < table->tableSize; i++){
 		hashItem* current = table->items[i];
 		hashItem* tmp = NULL;
 		while(current != NULL){

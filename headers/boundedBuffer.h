@@ -3,7 +3,7 @@
 
 typedef struct boundedBuffer boundedBuffer;
 
-boundedBuffer* initBuffer(size_t size);
+boundedBuffer* initBuffer(int size);
 
 int enqueueBuffer(boundedBuffer* buf, char* job);
 

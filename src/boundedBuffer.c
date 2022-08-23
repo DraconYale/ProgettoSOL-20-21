@@ -2,6 +2,7 @@
 Bounded buffer used to create the job queue. It's implemented as a circular queue (this may change)
 */
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <pthread.h>
 #include <errno.h>
@@ -16,17 +17,17 @@ struct boundedBuffer{
 	char** commands;						//circular queue
 	pthread_mutex_t mutex;
 	pthread_cond_t full;
-	pthread_cond t empty;
-}
+	pthread_cond_t empty;
+};
 
 
-boundedBuffer* initBuffer(size_t size){
+boundedBuffer* initBuffer(int size){
 	if(size <= 0){
 		errno = EINVAL;						//EINVAL 22 Argomento non valido (from: 'errno -l')
 		return NULL;
 	}
-	int err;
-	if((char** commands = calloc(size, sizeof(char*))) == NULL){
+	char** commands;
+	if((commands = calloc(size, sizeof(char*))) == NULL){
 		perror("calloc");
 		exit(EXIT_FAILURE);
 	
@@ -53,7 +54,7 @@ boundedBuffer* initBuffer(size_t size){
 
 
 int enqueueBuffer(boundedBuffer* buf, char* job){
-	if(buf == NULL || op == NULL){
+	if(buf == NULL || job == NULL){
 		errno = EINVAL;
 		return -1;
 	}
@@ -64,7 +65,7 @@ int enqueueBuffer(boundedBuffer* buf, char* job){
 		perror("Couldn't lock");
 		return -1;
 	}
-	while(buf->size == jobNumber){
+	while(buf->size == buf->jobNumber){
 		pthread_cond_wait(&(buf->full), &(buf->mutex));
 	}
 	(buf->commands[buf->head]) = job;
@@ -85,15 +86,15 @@ int dequeueBuffer(boundedBuffer* buf, char** retjob){
 		errno = EINVAL;
 		return -1;
 	}
-	int err
+	int err;
 	
 	//critical section
 	if((err = (pthread_mutex_lock(&(buf->mutex)))) != 0){
 		perror("Couldn't lock");
 		return -1;
 	}
-	while(jobNumber == 0){
-		pthread_cond_wait(&(buf->empty, &(buf->mutex));
+	while(buf->jobNumber == 0){
+		pthread_cond_wait(&(buf->empty), &(buf->mutex));
 	}
 	*retjob = (buf->commands[buf->tail]);
 	buf->tail = (buf->tail + 1) % buf->size;
@@ -110,10 +111,11 @@ int dequeueBuffer(boundedBuffer* buf, char** retjob){
 
 int cleanBuffer(boundedBuffer* buf){
 	free(buf->commands);
-	pthread_mutex_destroy(&(buffer->mutex));
-	pthread_cond_destroy(&(buffer->full));
-	pthread_cond_destroy(&(buffer->empty));
+	pthread_mutex_destroy(&(buf->mutex));
+	pthread_cond_destroy(&(buf->full));
+	pthread_cond_destroy(&(buf->empty));
 	free(buf);
+	return 0;
 }
 
 

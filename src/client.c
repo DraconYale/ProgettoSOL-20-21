@@ -1,9 +1,12 @@
+#define _GNU_SOURCE
 #include <dirent.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <time.h>
 #include <errno.h>
 
 #include <interface.h>
@@ -52,8 +55,7 @@ int setHelp = 0;
 int setDirWrite = 0;
 int nWrite = 0;
 int setDirRead = 0;
-int time = 0;
-int absTime = 5000;
+int timeC = 0;
 int connected = 0;
 char* filename = NULL;
 
@@ -63,6 +65,7 @@ int writeRecDir(char* dirname, char* dirMiss) {
 		return -1;
 	}
         
+        struct stat statBuf;
 	DIR * dir;
 
 	if ((dir=opendir(dirname)) == NULL) {
@@ -70,11 +73,11 @@ int writeRecDir(char* dirname, char* dirMiss) {
 		return -1;
 	} 
 	else {
-		struct dirent *elem;
+		struct dirent* elem;
 
 		while((errno=0, elem =readdir(dir)) != NULL && nWrite != 0) {
-			int parentL = strlen(nomedir);
-			int elemL = strlen(file->d_name);
+			int parentL = strlen(dirname);
+			int elemL = strlen(elem->d_name);
 			if ((parentL+elemL+2)>UNIX_PATH_MAX) {
 				errno = ENAMETOOLONG;	//ENAMETOOLONG 36 Nome del file troppo lungo (from "errno -l")
 				perror("readdir");
@@ -82,16 +85,19 @@ int writeRecDir(char* dirname, char* dirMiss) {
 			}
 				
 			char file[UNIX_PATH_MAX];
-			strncpy(file,dirname,UNIX_MAX_PATH-1);
+			strncpy(file,dirname,UNIX_PATH_MAX-1);
 				
 			if(dirname[strlen(dirname)-1] != '/'){
-				strncat(file,"/",UNIX_MAX_PATH-1)
+				strncat(file,"/",UNIX_PATH_MAX-1);
 			}
-			strncat(file,elem->d_name, UNIX_MAX_PATH-1);
-				
-			if(elem->d_type == DT_DIR && strcmp(elem->d_name, ".") != 0  && strcmp(elem->d_name, "..") != 0) {
+			strncat(file,elem->d_name, UNIX_PATH_MAX-1);
+			
+			if(stat(file, &statBuf) == -1) {
+				return -1;
+			}
+			if(S_ISDIR(statBuf.st_mode) && (strcmp(elem->d_name, ".") != 0)  && (strcmp(elem->d_name, "..") != 0)){
 				writeRecDir(file, dirMiss);
-			} 
+			}
 			else{
 				if (openFile(file, O_LOCK | O_CREATE) != 0){
 					perror("-w openFile");
@@ -107,7 +113,7 @@ int writeRecDir(char* dirname, char* dirMiss) {
 					return -1;
 				}
 				nWrite--;
-				sleep(time);
+				sleep(timeC);
 			}
 		}
 		if (errno != 0){
@@ -125,6 +131,9 @@ int main(int argc, char** argv){
 		return 1;
 	
 	}
+	struct timespec absTime;
+	absTime.tv_nsec = 0;
+	absTime.tv_sec = 10;
 	setPrint = false;
 	int i = 1;
 	char* dirWrite = calloc(MAXLEN, sizeof(char));
@@ -166,7 +175,7 @@ int main(int argc, char** argv){
 			}
 			if((strncmp(tmp, "-t", 2)) == 0){
 				if((tmpTime = isNumber(argv[i+1])) != -1){
-					time = tmpTime/1000;			//convert to milliseconds
+					timeC = tmpTime/1000;			//convert to milliseconds
 				}
 				else{
 					errno = EINVAL;
@@ -202,12 +211,12 @@ int main(int argc, char** argv){
 		    case 'f' :
 		    	if(!connected){
 			    	socket = optarg;
-			       	if(openConnection(socket, time, absTime) != 0){
+			       	if(openConnection(socket, timeC, absTime) != 0){
 			       		perror("-f");
 			       		return -1;
 			       	}
 			       	connected = 1;
-			       	sleep(time);
+			       	sleep(timeC);
 			       	break;
 		       	}
 		       	else{
@@ -220,11 +229,8 @@ int main(int argc, char** argv){
 		    case 'w' :
 		    	if(connected){
 		    		//tokenize optarg
-		    		DIR* directorySend;
-		    		DIR* directoryMiss;
 		    		char* dir = NULL;
 		    		char* nString = NULL;
-		    		int n = 0;
 		    		char* strtokState = NULL;
 		    		char* token = strtok_r(optarg, ",", &strtokState);
 		    		if(token != NULL){
@@ -237,8 +243,8 @@ int main(int argc, char** argv){
 		    		}
 		    		token = strtok_r(NULL, " ", &strtokState);
 		    		if(token != NULL){
-		    			if(strncmp(token, "n=", 2){
-		    				if(nString = strrchr(token, '=') != NULL){
+		    			if(strncmp(token, "n=", 2)){
+		    				if((nString = strrchr(token, '=')) != NULL){
 		    					if((nWrite = (isNumber(nString+1))) != -1){
 		    						continue;
 		    					}
@@ -265,7 +271,7 @@ int main(int argc, char** argv){
 		    		if(writeRecDir(dir, dirWrite) != 0){
 		    			return -1;
 		    		}
-		    		sleep(time);
+		    		sleep(timeC);
 		    		break;
 		    	
 		    	}
@@ -306,7 +312,7 @@ int main(int argc, char** argv){
 		    			w++;
 		    		}
 		    		free(files);
-		    		sleep(time);
+		    		sleep(timeC);
 		    		break;
 		    		
 		    	
@@ -336,18 +342,18 @@ int main(int argc, char** argv){
 		    			if((err = openFile(files[r], O_LOCK | O_CREATE)) != 0){
 		    				perror("-r opening file");
 		    			}
-		    			char* ansBuf = NULL
+		    			char* ansBuf = NULL;
 		    			size_t readSize = 0;
-		    			if((err = readFile(files[r],ansBuf,readSize)) != 0){
+		    			if((err = readFile(files[r], (void**) &ansBuf,&readSize)) != 0){
 		    					perror("-r read file");
 		    					break;
 		    			}
 		    			if(dirRead != NULL){
 		    				char file[UNIX_PATH_MAX];
-						strncpy(file,dirRead,UNIX_MAX_PATH-1);
-						strncat(file,files[r], UNIX_MAX_PATH-1);
+						strncpy(file,dirRead,UNIX_PATH_MAX-1);
+						strncat(file,files[r], UNIX_PATH_MAX-1);
 						FILE* dest;
-						if((dest = fopen(file, w)) == NULL){
+						if((dest = fopen(file, "w")) == NULL){
 							perror("-r opening dest file");
 							free(files);
 							break;
@@ -362,7 +368,7 @@ int main(int argc, char** argv){
 		    			r++;
 		    		}
 		    		free(files);
-		    		sleep(time);
+		    		sleep(timeC);
 		    		break;
 		    		
 		    	
@@ -378,16 +384,16 @@ int main(int argc, char** argv){
 		    	if(connected){
 		    		int n = 0;
 		    		if(optarg == 0){
-		    			if(err = (readNFiles(0,dirRead)) != 0){
+		    			if((err = (readNFiles(0,dirRead))) != 0){
 		    				perror("-R read");
 		    			}
 		    		}
 		    		else{   	
 		    			char* nString = NULL;		
-		    			if(strncmp(optarg, "n=", 2){
-		    				if(nString = strrchr(optarg, '=') != NULL){
+		    			if(strncmp(optarg, "n=", 2)){
+		    				if((nString = strrchr(optarg, '=')) != NULL){
 		    					if((n = (isNumber(nString+1))) != -1){
-		    						if(err = (readNFiles(n,dirRead)) != 0){
+		    						if((err = (readNFiles(n,dirRead))) != 0){
 		    							perror("-R read");
 		    						}
 		    					}
@@ -409,7 +415,7 @@ int main(int argc, char** argv){
 		    			}
 		    		
 		    		}
-		    		sleep(time);
+		    		sleep(timeC);
 		    		break;
 		    		
 		    	}
@@ -435,7 +441,7 @@ int main(int argc, char** argv){
 		    		}
 		    		int l = 0;						//index used for pointing the files
 		    		while(l<filesNumber){
-		    			if((err = openFile(files[l]), O_LOCK | O_CREATE) != 0){
+		    			if((err = openFile((files[l]), O_LOCK | O_CREATE) != 0)){
 		    				perror("-l opening file");
 		    			}
 		    			if((err = lockFile(files[l])) != 0){
@@ -444,7 +450,7 @@ int main(int argc, char** argv){
 		    			l++;
 		    		}
 		    		free(files);
-		    		sleep(time);
+		    		sleep(timeC);
 		    		break;
 		    		
 		    	
@@ -469,7 +475,7 @@ int main(int argc, char** argv){
 		    		}
 		    		int u = 0;						//index used for pointing the files
 		    		while(u<filesNumber){
-		    			if((err = openFile(files[u]), O_LOCK | O_CREATE) != 0){
+		    			if((err = openFile((files[u]), O_LOCK | O_CREATE) != 0)){
 		    				perror("-u opening file");
 		    			}
 		    			if((err = unlockFile(files[u])) != 0){
@@ -478,7 +484,7 @@ int main(int argc, char** argv){
 		    			u++;
 		    		}
 		    		free(files);
-		    		sleep(time);
+		    		sleep(timeC);
 		    		break;
 		    	
 		    	}
@@ -502,7 +508,7 @@ int main(int argc, char** argv){
 		    		}
 		    		int c = 0;						//index used for pointing the files
 		    		while(c<filesNumber){
-		    			if((err = openFile(files[c]), O_LOCK | O_CREATE) != 0){
+		    			if((err = openFile((files[c]), O_LOCK | O_CREATE) != 0)){
 		    				perror("-c opening file");
 		    			}
 		    			if((err = removeFile(files[c])) != 0){
@@ -511,7 +517,7 @@ int main(int argc, char** argv){
 		    			c++;
 		    		}
 		    		free(files);
-		    		sleep(time);
+		    		sleep(timeC);
 		    		break;
 		    	
 		    	}

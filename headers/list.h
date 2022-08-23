@@ -1,11 +1,19 @@
 #ifndef LIST_H_DEFINED
 #define LIST_H_DEFINED
 
-typedef struct elem elem;
+typedef struct elem{
+	void* info;
+	struct elem* next;
+	struct elem* prev;
+}elem;
 
-typedef struct list list;
+typedef struct list{
+	elem* head;
+	elem* tail;
+	int elemNumber;
+}list;
 
-list createList();
+list* initList();
 
 elem* getHead(list* list);
 
@@ -21,8 +29,12 @@ elem* popTail(list* list);
 
 int containsList(list* list, char* str);
 
-int removeList(list* list, char* str);
+int removeList(list* list, void* str);
 
 elem* nextList(list* list, elem* elem);
+
+int elemsNumber(list* list);
+
+void freeList(list* list);
 
 #endif

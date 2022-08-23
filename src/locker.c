@@ -1,5 +1,6 @@
 #include <pthread.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <errno.h>
 
 #include <locker.h>
@@ -12,7 +13,7 @@ struct locker{
 	pthread_cond_t cond;
 	bool writerPresence;
 	int readersNumber;
-}
+};
 
 locker* lockerInit(){
 	int err;
@@ -38,7 +39,7 @@ locker* lockerInit(){
 	newLocker->writerPresence = false;
 	newLocker->readersNumber = 0;
 	
-	return newLock;
+	return newLocker;
 }
 
 
@@ -70,7 +71,7 @@ int readUnlock(locker* lock){
 		errno = EINVAL;
 		return -1;
 	}
-	if((err = pthread_mutex_lock(&(lock->mux))) != 0) != 0){
+	if((err = pthread_mutex_lock(&(lock->mux))) != 0){
 		errno = err;
 		return -1;
 	}
@@ -78,7 +79,7 @@ int readUnlock(locker* lock){
 	if(lock->readersNumber == 0){
 		pthread_cond_signal(&(lock->cond));
 	}					
-	if((err = pthread_mutex_unlock(&(lock->mux))) != 0) != 0){
+	if((err = pthread_mutex_unlock(&(lock->mux))) != 0){
 		errno = err;
 		return -1;
 	}
@@ -97,10 +98,10 @@ int writeLock(locker* lock){
 		errno = err;
 		return -1;
 	}	
-	while(writerPresence){					//writer waits for other writers to finish
+	while(lock->writerPresence){					//writer waits for other writers to finish
 		pthread_cond_wait(&(lock->cond), &(lock->mux));
 	}					
-	writerPresence = true;
+	lock->writerPresence = true;
 	while(lock->readersNumber != 0){			//writer waits for readers to finish
 		pthread_cond_wait(&(lock->cond), &(lock->mux));
 	}	
@@ -124,7 +125,7 @@ int writeUnlock(locker* lock){
 		errno = err;
 		return -1;
 	}				
-	writerPresence = false;
+	lock->writerPresence = false;
 	pthread_cond_broadcast(&(lock->cond));			
 	if((err = pthread_mutex_unlock(&(lock->mux))) != 0){
 		errno = err;
@@ -141,7 +142,7 @@ int freeLock(locker* lock){
 	pthread_mutex_destroy(&(lock->mux));
 	pthread_cond_destroy(&(lock->cond));
 	free(lock);
-
+	return 0;
 }
 
 

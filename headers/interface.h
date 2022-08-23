@@ -1,6 +1,11 @@
 #ifndef INTERFACE_H_DEFINED
 #define INTERFACE_H_DEFINED
 
+#define _GNU_SOURCE
+
+#include <time.h>
+#include <stdbool.h>
+
 extern bool setPrint;
 
 int openConnection(const char* sockname, int msec, const struct timespec abstime);

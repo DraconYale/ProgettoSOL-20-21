@@ -69,20 +69,23 @@ int enqueueBuffer(boundedBuffer* buf, char* job){
 		pthread_cond_wait(&(buf->full), &(buf->mutex));
 	}
 	(buf->commands[buf->head]) = job;
+	printf("job enqueue %s\n", buf->commands[buf->head]);
 	buf->head = (buf->head + 1) % buf->size;
 	buf->jobNumber = buf->jobNumber + 1;
-	if(buf->jobNumber == (buf->size)){
-		pthread_cond_broadcast(&(buf->empty));
+	if(buf->jobNumber != 0){
+		pthread_cond_signal(&(buf->empty));
 	}
+	printf("enqueue: numero di job %d\n", buf->jobNumber);
 	if((err = (pthread_mutex_unlock(&(buf->mutex)))) != 0){
 		perror("Couldn't unlock");
 		return -1;
 	}
+	printf("caricato\n");
 	return 0;
 }	
 
 int dequeueBuffer(boundedBuffer* buf, char** retjob){
-	if(buf == NULL || *retjob == NULL){
+	if(buf == NULL){
 		errno = EINVAL;
 		return -1;
 	}
@@ -96,12 +99,14 @@ int dequeueBuffer(boundedBuffer* buf, char** retjob){
 	while(buf->jobNumber == 0){
 		pthread_cond_wait(&(buf->empty), &(buf->mutex));
 	}
+	printf("job dequeue %s\n", buf->commands[buf->tail]);
 	*retjob = (buf->commands[buf->tail]);
 	buf->tail = (buf->tail + 1) % buf->size;
 	buf->jobNumber = buf->jobNumber - 1;
 	if(buf->jobNumber == 0){
 		pthread_cond_broadcast(&(buf->full));
 	}
+	printf("dequeue: numero di job %d\n", buf->jobNumber);
 	if((err = (pthread_mutex_unlock(&(buf->mutex)))) != 0){
 		perror("Couldn't unlock");
 		return -1;

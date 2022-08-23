@@ -26,6 +26,8 @@ txtFile* txtInit(){
 	conf->storageSize = 0;
 	conf->storageFileNumber = 0;
 	conf->pathToSocket = calloc(MAX_SOCKET_LENGHT, sizeof(char));
+	conf->repPolicy = 0;
+	conf->logPath = calloc(BUFFERSIZE, sizeof(char));
 	return conf;
 }
 
@@ -44,10 +46,12 @@ int applyConfig(txtFile* conf, const char* pathToConfig){
 	if((config = fopen(pathToConfig, "r")) == NULL){						//fopen sets errno when fails
 		return -1;
 	}
-	char* buf = calloc(BUFFERSIZE, sizeof(char));
+	char buf[BUFFERSIZE];
 	long value;
+	int i = 0;
 	//fgets reads BUFFERSIZE bytes from conf and saves them in buf and stops after '\n' or newline							
 	while(!feof(config)){
+		memset(buf, 0, BUFFERSIZE);
 		fgets(buf, BUFFERSIZE, config);			
 		//parser needs to search for every defined config in configuration file
 		if(strncmp(buf, WORKERS, strlen(WORKERS)) == 0){
@@ -62,7 +66,8 @@ int applyConfig(txtFile* conf, const char* pathToConfig){
 			}
 			else{
 				conf->workerNumber = value;
-				break;
+				i++;
+				continue;
 			}
 		}
 		if(strncmp(buf, STORAGEB, strlen(STORAGEB)) == 0){
@@ -77,7 +82,8 @@ int applyConfig(txtFile* conf, const char* pathToConfig){
 			}
 			else{
 				conf->storageSize = value;
-				break;
+				i++;
+				continue;
 			}
 		}
 		if(strncmp(buf, STORAGEF, strlen(STORAGEF)) == 0){
@@ -92,12 +98,15 @@ int applyConfig(txtFile* conf, const char* pathToConfig){
 			}
 			else{
 				conf->storageFileNumber = value;
-				break;
+				i++;
+				continue;
 			}
 		}
 		if(strncmp(buf, SOCKET, strlen(SOCKET)) == 0){
-			strncpy(conf->pathToSocket, buf+strlen(SOCKET), MAX_SOCKET_LENGHT); 		
-			break;
+			strncpy(conf->pathToSocket, buf+strlen(SOCKET), MAX_SOCKET_LENGHT);
+			conf->pathToSocket[strcspn(conf->pathToSocket, "\n")] = '\0';
+			i++; 		
+			continue;
 		}
 		if(strncmp(buf, REPOLICY, strlen(REPOLICY)) == 0){
 			value = strtol(buf + strlen(REPOLICY), NULL, 10); 				//strtol of value, base 10
@@ -111,12 +120,16 @@ int applyConfig(txtFile* conf, const char* pathToConfig){
 			}
 			else{
 				conf->repPolicy = value;
-				break;
+				i++;
+				continue;
 			}
 		}
 		
 		if(strncmp(buf, LOGFILE, strlen(LOGFILE)) == 0){
 			strncpy(conf->logPath, buf+strlen(LOGFILE), BUFFERSIZE);
+			conf->logPath[strcspn(conf->logPath, "\n")] = '\0';
+			i++;
+			continue;
 		}
 	}
 	if(fclose(config) != 0){									//fclose sets errno

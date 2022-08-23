@@ -67,6 +67,7 @@ int openConnection(const char* sockname, int msec, const struct timespec abstime
 		errno = 0;
 	}
 	strcpy(cSockname, sockname);
+	printf("%s\n", cSockname);
 	PRINT(setPrint, "openConnection to %s: OK\n", sockname);
 	return 0;
 }
@@ -86,8 +87,9 @@ int closeConnection(const char* sockname){
 	char* tmpBuf = calloc(COMMLENGTH, sizeof(char));
 	//request will be parsed by server
 	snprintf(tmpBuf, COMMLENGTH, "%d", CLOSECONN);
+	printf("%s\n", tmpBuf);
 	if(writen(csfd, (void *)tmpBuf, COMMLENGTH) == -1){
-		PRINT(setPrint, "openFile %s: fail with error %d\n", sockname, errno);
+		PRINT(setPrint, "closeConnection %s: fail with error %d\n", sockname, errno);
 		return -1;
 	}
 	if (close(csfd) != 0){
@@ -740,6 +742,7 @@ int lockFile(const char* pathname){
 	char* tmpBuf = calloc(COMMLENGTH, sizeof(char));
 	//request will be parsed by server
 	snprintf(tmpBuf, COMMLENGTH, "%d %s", LOCK, pathname);
+	printf("%s\n", tmpBuf);
 	if(writen(csfd, (void *)tmpBuf, COMMLENGTH) == -1){
 		PRINT(setPrint, "lockFile %s: fail with error %d\n", pathname, errno);
 		return -1;

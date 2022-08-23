@@ -112,8 +112,7 @@ int main (int argc, char** argv){
 		perror("socket");
 		exit(EXIT_FAILURE);
 	}
-	
-	if((bind(fd_skt, (struct sockaddr*)&sa, sizeof(sa))) == -1){
+	if((bind(fd_skt, (struct sockaddr*) &sa, sizeof(sa))) == -1){
 		perror("bind");
 		exit(EXIT_FAILURE);
 	
@@ -174,7 +173,6 @@ int main (int argc, char** argv){
 	}
 	int i = 0;
 	while(i < config->workerNumber){
-		
 		if(((pthread_create(&(workerThreads[i]), NULL, &workFunc, (void*) workArgs))) != 0){
 			perror("pthread_create workers");
 			exit(EXIT_FAILURE);
@@ -197,7 +195,7 @@ int main (int argc, char** argv){
 	int re_fd;
 	
 	while(true){
-	
+		printf("n client %d\n", clientsOnline);
 		//SIGINT or SIGQUIT
 		if(term){
 			goto cleanall;
@@ -211,9 +209,20 @@ int main (int argc, char** argv){
 		timeCopy = timeout;
 	
 		if((select(fd_num+1, &setCopy, NULL, NULL, &timeCopy)) == -1){
-		
-			perror("select");
-			goto cleanall;
+			
+			if (errno != EINTR){
+				perror("select");
+				exit(EXIT_FAILURE);
+			}
+			else{
+				if (blockNewClients && clientsOnline == 0){
+					break;
+				}
+				if(term){
+					goto cleanall;
+				}
+				continue;
+			}
 		
 		}
 		i = 0;
@@ -222,7 +231,7 @@ int main (int argc, char** argv){
 			if(FD_ISSET(i, &setCopy)){
 				//client connection
 				if(i == fd_skt){
-				
+					printf("lettura socket\n");
 					if((fd_client = accept(fd_skt, NULL, 0)) != -1){					
 						FD_SET(fd_client, &managerReadSet);
 						clientsOnline++;
@@ -231,7 +240,7 @@ int main (int argc, char** argv){
 						}
 						currTime = time(NULL);
 						nowS = fabs(difftime(initTime, currTime));
-						LOG("[%d] Server: new connection from client %d", (int) nowS, fd_client);
+						LOG("[%d] Server: new connection from client %d\n", (int) nowS, fd_client);
 					}
 					else{
 						perror("accept");
@@ -241,8 +250,8 @@ int main (int argc, char** argv){
 				}
 				
 				//pipe notifies that a request has been satisfied
-				if(i == pipeMW[0]){
-				
+				else if(i == pipeMW[0]){
+					printf("lettura pipe\n");
 					if(readn(i, (void*) pipeBuff, BUFFERSIZE) <= 0){
 						printf("Pipe error\n");
 						exit(EXIT_FAILURE);
@@ -252,9 +261,9 @@ int main (int argc, char** argv){
 						clientsOnline--;
 						currTime = time(NULL);
 						nowS = fabs(difftime(initTime, currTime));
-						LOG("[%d] Server: client disconnected", (int) nowS);
+						LOG("[%d] Server: client disconnected\n", (int) nowS);
 						if(clientsOnline == 0 && blockNewClients){
-							goto cleanall;
+							break;
 						}
 					
 					}
@@ -265,14 +274,16 @@ int main (int argc, char** argv){
 						}
 					}
 									
-				}
-				//new request
-				else{
+				}else{
+					//new request
+					printf("lettura client\n");
 					memset(command, 0, COMMLENGTH);
 					snprintf(command, COMMLENGTH, "%d", i);
+					FD_CLR(i, &managerReadSet);
 					if(i == fd_num){
 						fd_num--;					
 					}
+					printf("client %d\n", i);
 					if(enqueueBuffer(jobQueue, command) == -1){
 						perror("enqueue");
 						exit(EXIT_FAILURE);
@@ -281,54 +292,51 @@ int main (int argc, char** argv){
 				
 				
 				}
+				//new request
+				
 						
 			}
 		
 		}
 	}
 	
-	
-	
-	
-	
 	cleanall:
-		int j = 0;
-		snprintf(command, COMMLENGTH, "%d", -1);
-		for (j = 0; j < config->workerNumber; j++){
-			if(enqueueBuffer(jobQueue, command) != 0){
-				perror("enqueue");
-				exit(EXIT_FAILURE);
-			}
-		}
-		for (j = 0; j < config->workerNumber; j++){
-			pthread_join(workerThreads[j], NULL);
-		}
-		pthread_join(sigHandler, NULL);
-		updateStorage(storage);
-		printf("==STORAGE INFO==\n");
-		printf("Max number of files stored: %d", storage->maxFileStored);
-		printf("Max megabytes stored: %lu", (storage->maxMBStored)/1000000);
-		printf("Replacement algorithm sent %d victims", storage->victimNumb);
-		printf("Currently stored files:\n");
-		printList(storage->filesFIFOQueue);
-		LOG("Max megabytes stored: %lu\n", (storage->maxMBStored)/1000000);
-		LOG("Max number of files stored: %d", storage->maxFileStored);
-		LOG("Replacement algorithm sent %d victims", storage->victimNumb);
-		unlink(socketPath);		
-		if(cleanConf(config) != 0){
-			perror("cleanConf");
+	snprintf(command, COMMLENGTH, "%d", -1);
+	for (i = 0; i < config->workerNumber; i++){
+		if(enqueueBuffer(jobQueue, command) != 0){
+			perror("enqueue");
 			exit(EXIT_FAILURE);
 		}
-		freeStorage(storage);
-		cleanBuffer(jobQueue);
-		free(workerThreads);
-		close(pipeMW[0]); 
-		close(pipeMW[1]);
-		close(fd_skt);
-		LOG("Server terminated successfully\n");
-		fclose(logFile);
-		
+	}
+	for (i = 0; i < config->workerNumber; i++){
+		pthread_join(workerThreads[i], NULL);
+	}
+	pthread_join(sigHandler, NULL);
+	updateStorage(storage);
+	printf("==STORAGE INFO==\n");
+	printf("Max number of files stored: %d\n", storage->maxFileStored);
+	printf("Max megabytes stored: %lu\n", (storage->maxMBStored)/1000000);
+	printf("Replacement algorithm sent %d victims\n", storage->victimNumb);
+	printf("Currently stored files:\n");
+	printList(storage->filesFIFOQueue);
+	LOG("Max megabytes stored: %lu\n", (storage->maxMBStored)/1000000);
+	LOG("Max number of files stored: %d\n", storage->maxFileStored);
+	LOG("Replacement algorithm sent %d victims\n", storage->victimNumb);
+	unlink(socketPath);		
+	if(cleanConf(config) != 0){
+		perror("cleanConf");
+		exit(EXIT_FAILURE);
+	}
+	freeStorage(storage);
+	cleanBuffer(jobQueue);
+	free(workerThreads);
+	close(pipeMW[0]); 
+	close(pipeMW[1]);
+	close(fd_skt);
+	LOG("Server terminated successfully\n");
+	fclose(logFile);
 	return 0;
+		
 }
 
 static void* signalHandling(void* set){
@@ -336,20 +344,22 @@ static void* signalHandling(void* set){
 	sigset_t* copySet = (sigset_t*) set;
 	int sig;
 	while(1){
-		if((sigwait(copySet, &sig)) == 0){
-			if(sig == SIGINT || sig == SIGQUIT){
+		if(sigwait(copySet, &sig) != 0){
+			exit(EXIT_FAILURE);
+		}
+		switch(sig){
+			case SIGINT:
+			case SIGQUIT:
 				term = 1;
 				return NULL;
-			}
-			if(sig == SIGHUP){
+				
+			case SIGHUP:
 				blockNewClients = 1;
-				return NULL;			
-			}	
-		
+				return NULL;
+			default:
+				break;
 		}
 	}
-
-
 }
 
 static void* workFunc(void* args){
@@ -365,8 +375,8 @@ static void* workFunc(void* args){
 	operation op;
 	char* fdString;
 	int fd_client;
-	char* returnStr = NULL;
-	char* command = NULL;
+	char returnStr[BUFFERSIZE];
+	char* command = malloc(COMMLENGTH*sizeof(char));
 	char* tokComm;
 	char* token;
 	char* pathname;
@@ -388,22 +398,31 @@ static void* workFunc(void* args){
 	
 	//messages from clients are like "opcode arguments"
 	//strtok_r is used to retrieve the arguments
-	while(1){
+	while(true){
+		printf("entro nel while\n");
 		fdString = NULL;
 		strtokState = NULL;
 		if(dequeueBuffer(commands, &fdString) != 0){
 			perror("dequeue");
 			exit(EXIT_FAILURE);		
 		}
+		printf("ho scaricato\n");
 		sscanf(fdString, "%d", &fd_client);
+		if(fd_client == -1){
+			fdString = NULL;
+			break;
+		}
 		memset(command, 0, COMMLENGTH);
 		if(readn(fd_client, (void*) command, COMMLENGTH) <= 0){
 			exit(EXIT_FAILURE);		
 		}
 		tokComm = command;
 		token = strtok_r(tokComm, " ", &strtokState);
+		printf("command %s\n", command);
 		if(token != NULL){
 			sscanf(token, "%d", (int*) &op);
+			printf("%d\n", op);
+			printf("arrivato\n");
 			switch(op){
 				//OPEN
 				case OPEN: 
@@ -761,6 +780,7 @@ static void* workFunc(void* args){
 					break;
 				//LOCK	
 				case LOCK:
+					printf("lock\n");
 					token = strtok_r(NULL, " ", &strtokState);
 					memset(pathname, 0, COMMLENGTH);
 					sscanf(token, "%s", pathname);
@@ -932,6 +952,7 @@ static void* workFunc(void* args){
 					
 				//CLOSECONN
 				case CLOSECONN:
+					printf("AOO\n");
 					memset(pipeBuff, 0, BUFFERSIZE);
 					snprintf(pipeBuff, BUFFERSIZE, "%d", -1);
 					if(writen(pOut, (void*) pipeBuff, BUFFERSIZE) == -1){
@@ -942,8 +963,8 @@ static void* workFunc(void* args){
 			}
 			
 		}
-		free(fdString);
+		fdString = NULL;
 	
 	}
-	return 0;
+	return NULL;
 }

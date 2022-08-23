@@ -206,9 +206,12 @@ int main(int argc, char** argv){
 	char* socket = NULL;
 	int opt;
 	int err;
-	while((opt = getopt(argc, argv, "f:w:W:r:R::l:u:c:")) != -1){
+	while((opt = getopt(argc, argv, "hf:w:W:D:r:R::d:t:l:u:c:p")) != -1){
 		switch(opt){
-		    case 'f' :
+		   case 'h':
+		   	break;
+			
+		   case 'f' :
 		    	if(!connected){
 			    	socket = optarg;
 			       	if(openConnection(socket, timeC, absTime) != 0){
@@ -323,7 +326,8 @@ int main(int argc, char** argv){
 		    		break;
 		    	}
 		    	
-		    	
+		    case 'D':
+		    	break;
 		        
 		    case 'r' :
 		    	if(connected){
@@ -425,8 +429,12 @@ int main(int argc, char** argv){
 		    		break;
 		    	}
 		    	
-		   
-	
+		    case 'd':
+		    	break;
+		    	
+		    case 't':
+		    	break;
+		    	
 		    case 'l' :
 		    	if(connected){
 		    		//tokenize optarg
@@ -519,21 +527,21 @@ int main(int argc, char** argv){
 		    		free(files);
 		    		sleep(timeC);
 		    		break;
-		    	
+		   
 		    	}
 		    	else{
 		    		errno = ENOTCONN; 	//ENOTCONN 107 Il socket di destinazione non è connesso (from "errno -l")
 				perror("-c");
 		    		break;
 		    	}
+		    	
+		    case 'p':
+		    	break;
         	}
+        	
 	}
-	if(dirWrite != NULL){
-		free(dirWrite);
-	}
-	if(dirRead != NULL){
-		free(dirRead);
-	}
+	free(dirWrite);
+	free(dirRead);
 	if(closeConnection(socket) != 0){
 		perror("closeConnection");
 		return -1;

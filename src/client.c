@@ -42,6 +42,14 @@ long isNumber(const char* s) {
 	return -1;
 }
 
+int isDot(const char* dir) {
+	int l = strlen(dir);
+	if ((l>0 && dir[l-1] == '.')){
+		return 1;
+	}
+	return 0;
+}
+
 //validator checks if str is an option. Returns 0 if str is equal to one of the options
 int validator(char* str){
 	return ((strncmp(str, "-h", 4)) && (strncmp(str, "-f", 4)) && (strncmp(str, "-w", 4)) && \
@@ -59,61 +67,70 @@ int timeC = 0;
 int connected = 0;
 char* filename = NULL;
 
+
+
 //function used to visit recursively directories and send to server the files stored in them
 int writeRecDir(char* dirname, char* dirMiss) {
 	if(dirname == NULL){
 		return -1;
 	}
-        
+        extern int nWrite;
+        if(nWrite == 0){
+        	return 0;
+        }
         struct stat statBuf;
 	DIR * dir;
 
 	if ((dir=opendir(dirname)) == NULL) {
 		perror("opendir");
 		return -1;
-	} 
+	}
+	if(stat(dirname, &statBuf) == -1) {
+		return -1;
+	}
 	else {
 		struct dirent* elem;
 
-		while((errno=0, elem =readdir(dir)) != NULL && nWrite != 0) {
-			int parentL = strlen(dirname);
-			int elemL = strlen(elem->d_name);
-			if ((parentL+elemL+2)>UNIX_PATH_MAX) {
-				errno = ENAMETOOLONG;	//ENAMETOOLONG 36 Nome del file troppo lungo (from "errno -l")
-				perror("readdir");
-				return -1;
-			}
+		while((errno=0, elem =readdir(dir)) != NULL ) {
+			if(!isDot(elem->d_name)){
+				int parentL = strlen(dirname);
+				int elemL = strlen(elem->d_name);
+				if ((parentL+elemL+2)>UNIX_PATH_MAX) {
+					errno = ENAMETOOLONG;	//ENAMETOOLONG 36 Nome del file troppo lungo (from "errno -l")
+					perror("readdir");
+					return -1;
+				}
 				
-			char file[UNIX_PATH_MAX];
-			strncpy(file,dirname,UNIX_PATH_MAX-1);
+				char file[UNIX_PATH_MAX];
+				strncpy(file, dirname, UNIX_PATH_MAX-1);
+					
+				if(dirname[strlen(dirname)-1] != '/'){
+					strncat(file,"/",UNIX_PATH_MAX-1);
+				}
+				strncat(file, elem->d_name, UNIX_PATH_MAX-1);
 				
-			if(dirname[strlen(dirname)-1] != '/'){
-				strncat(file,"/",UNIX_PATH_MAX-1);
-			}
-			strncat(file,elem->d_name, UNIX_PATH_MAX-1);
-			
-			if(stat(file, &statBuf) == -1) {
-				return -1;
-			}
-			if(S_ISDIR(statBuf.st_mode) && (strcmp(elem->d_name, ".") != 0)  && (strcmp(elem->d_name, "..") != 0)){
-				writeRecDir(file, dirMiss);
-			}
-			else{
-				if (openFile(file, O_LOCK | O_CREATE) != 0){
-					perror("-w openFile");
+				if(stat(file, &statBuf) == -1) {
 					return -1;
 				}
-			
-				if(writeFile(file, dirMiss) != 0){
-					perror("-w writeFile");
-					return -1;
+				if((S_ISDIR(statBuf.st_mode))){
+					writeRecDir(file, dirMiss);
 				}
-				if(closeFile(file) != 0){
-					perror("-w closeFile");
-					return -1;
+				else{
+					if (openFile(file, O_LOCK | O_CREATE) != 0){
+						perror("-w openFile");
+						return -1;
+					}
+					if(writeFile(file, dirMiss) != 0){
+						perror("-w writeFile");
+						return -1;
+					}
+					if(closeFile(file) != 0){
+						perror("-w closeFile");
+						return -1;
+					}
+					nWrite--;
+					sleep(timeC);
 				}
-				nWrite--;
-				sleep(timeC);
 			}
 		}
 		if (errno != 0){
@@ -312,6 +329,9 @@ int main(int argc, char** argv){
 		    			if((err = writeFile(files[w],dirWrite)) != 0){
 		    					perror("-W write");
 		    			}
+		    			if((err = (closeFile(files[w]))) != 0){
+						perror("-W closeFile");
+					}
 		    			w++;
 		    		}
 		    		free(files);
@@ -332,46 +352,48 @@ int main(int argc, char** argv){
 		    case 'r' :
 		    	if(connected){
 		    		//tokenize optarg
-		    		char** files = calloc(MAXLEN, sizeof(char*));
-		 		int filesNumber = 0;
 		    		char* strtokState = NULL;
 		    		char* token = strtok_r(optarg, ",", &strtokState);
-		    		while(token != NULL){
-		    			files[filesNumber] = token;
+		    		/*while(token != NULL){
+		    			strncpy(files[filesNumber], token, strlen(token));
 		    			filesNumber++;
 		    			token = strtok_r(NULL, ",", &strtokState);
 		    		}
-		    		int r = 0;						//index used for pointing the files
-		    		while(r<filesNumber){
-		    			if((err = openFile(files[r], O_LOCK | O_CREATE)) != 0){
+		    		*/						
+		    		while(token != NULL){
+		    			printf("leggo il file %s\n", token);
+		    			if((err = openFile(token, 0)) != 0){
 		    				perror("-r opening file");
 		    			}
 		    			char* ansBuf = NULL;
 		    			size_t readSize = 0;
-		    			if((err = readFile(files[r], (void**) &ansBuf,&readSize)) != 0){
+		    			if((err = readFile(token, (void**) &ansBuf,&readSize)) != 0){
 		    					perror("-r read file");
 		    					break;
 		    			}
 		    			if(dirRead != NULL){
 		    				char file[UNIX_PATH_MAX];
 						strncpy(file,dirRead,UNIX_PATH_MAX-1);
-						strncat(file,files[r], UNIX_PATH_MAX-1);
+						strncat(file,token, UNIX_PATH_MAX-1);
 						FILE* dest;
 						if((dest = fopen(file, "w")) == NULL){
 							perror("-r opening dest file");
-							free(files);
+							//free(files);
 							break;
 						}
 						if(fwrite(ansBuf, readSize, 1, dest) != 1){
 							perror("-r writing in dest file");
-							free(files);
+							//free(files);
 							break;
 						}
 						fclose(dest);
 		    			}
-		    			r++;
+		    			if(closeFile(token) != 0){
+						perror("-r closeFile");
+					}
+					token = strtok_r(NULL, ",", &strtokState);
 		    		}
-		    		free(files);
+		    		//free(files);
 		    		sleep(timeC);
 		    		break;
 		    		
@@ -449,12 +471,16 @@ int main(int argc, char** argv){
 		    		}
 		    		int l = 0;						//index used for pointing the files
 		    		while(l<filesNumber){
-		    			if((err = openFile((files[l]), O_LOCK | O_CREATE) != 0)){
+		    			if((err = openFile((files[l]), 0) != 0)){
 		    				perror("-l opening file");
+		    				break;
 		    			}
 		    			if((err = lockFile(files[l])) != 0){
 		    					perror("-l lock");
 		    			}
+		    			if((err = closeFile(files[l])) != 0){
+						perror("-l closeFile");
+					}
 		    			l++;
 		    		}
 		    		free(files);
@@ -483,12 +509,16 @@ int main(int argc, char** argv){
 		    		}
 		    		int u = 0;						//index used for pointing the files
 		    		while(u<filesNumber){
-		    			if((err = openFile((files[u]), O_LOCK | O_CREATE) != 0)){
+		    			if((err = openFile((files[u]), 0) != 0)){
 		    				perror("-u opening file");
+		    				break;
 		    			}
 		    			if((err = unlockFile(files[u])) != 0){
 		    					perror("-u unlock");
 		    			}
+		    			if((err = closeFile(files[u])) != 0){
+						perror("-u closeFile");
+					}
 		    			u++;
 		    		}
 		    		free(files);
@@ -516,7 +546,8 @@ int main(int argc, char** argv){
 		    		}
 		    		int c = 0;						//index used for pointing the files
 		    		while(c<filesNumber){
-		    			if((err = openFile((files[c]), O_LOCK | O_CREATE) != 0)){
+		    			printf("f");
+		    			if((err = openFile((files[c]), O_LOCK) != 0)){
 		    				perror("-c opening file");
 		    			}
 		    			if((err = removeFile(files[c])) != 0){

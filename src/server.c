@@ -16,7 +16,7 @@
 
 #include <boundedBuffer.h>
 #include <list.h>
-#include <hashtable.h>
+#include <icl_hash.h>
 #include <txtParser.h>
 #include <locker.h>
 #include <storage.h>
@@ -101,7 +101,6 @@ int main (int argc, char** argv){
 		perror("Apply configuration");
 		exit(EXIT_FAILURE);
 	}
-	
 	//socket init
 	char* socketPath = config->pathToSocket;
 	int fd_skt = -1;
@@ -154,7 +153,7 @@ int main (int argc, char** argv){
 	}
 	
 	FILE* logFile = NULL;
-	if((logFile = fopen(config->logPath, "w+")) == NULL){
+	if((logFile = fopen(config->logPath, "w")) == NULL){
 		perror("fopen");
 		exit(EXIT_FAILURE);
 	}
@@ -186,7 +185,7 @@ int main (int argc, char** argv){
 	fd_set setCopy;
 	struct timeval timeout;
 	timeout.tv_sec = 0;
-	timeout.tv_usec = 200000;	//200 ms
+	timeout.tv_usec = 100000;	//200 ms
 	struct timeval timeCopy;
 	int fd_client = -1;
 	char command[COMMLENGTH];
@@ -195,8 +194,8 @@ int main (int argc, char** argv){
 	int re_fd;
 	
 	while(true){
-		printf("n client %d\n", clientsOnline);
 		//SIGINT or SIGQUIT
+		
 		if(term){
 			goto cleanall;
 		}
@@ -231,7 +230,6 @@ int main (int argc, char** argv){
 			if(FD_ISSET(i, &setCopy)){
 				//client connection
 				if(i == fd_skt){
-					printf("lettura socket\n");
 					if((fd_client = accept(fd_skt, NULL, 0)) != -1){					
 						FD_SET(fd_client, &managerReadSet);
 						clientsOnline++;
@@ -251,7 +249,6 @@ int main (int argc, char** argv){
 				
 				//pipe notifies that a request has been satisfied
 				else if(i == pipeMW[0]){
-					printf("lettura pipe\n");
 					if(readn(i, (void*) pipeBuff, BUFFERSIZE) <= 0){
 						printf("Pipe error\n");
 						exit(EXIT_FAILURE);
@@ -276,14 +273,12 @@ int main (int argc, char** argv){
 									
 				}else{
 					//new request
-					printf("lettura client\n");
 					memset(command, 0, COMMLENGTH);
 					snprintf(command, COMMLENGTH, "%d", i);
 					FD_CLR(i, &managerReadSet);
 					if(i == fd_num){
 						fd_num--;					
 					}
-					printf("client %d\n", i);
 					if(enqueueBuffer(jobQueue, command) == -1){
 						perror("enqueue");
 						exit(EXIT_FAILURE);
@@ -313,12 +308,13 @@ int main (int argc, char** argv){
 	}
 	pthread_join(sigHandler, NULL);
 	updateStorage(storage);
-	printf("==STORAGE INFO==\n");
+	printf("\n==STORAGE INFO==\n\n");
 	printf("Max number of files stored: %d\n", storage->maxFileStored);
-	printf("Max megabytes stored: %lu\n", (storage->maxMBStored)/1000000);
+	printf("Max megabytes stored: %5f MB\n", (float) (storage->maxMBStored)/1000000);
 	printf("Replacement algorithm sent %d victims\n", storage->victimNumb);
 	printf("Currently stored files:\n");
 	printList(storage->filesFIFOQueue);
+	printf("\n");
 	LOG("Max megabytes stored: %lu\n", (storage->maxMBStored)/1000000);
 	LOG("Max number of files stored: %d\n", storage->maxFileStored);
 	LOG("Replacement algorithm sent %d victims\n", storage->victimNumb);
@@ -329,6 +325,7 @@ int main (int argc, char** argv){
 	}
 	freeStorage(storage);
 	cleanBuffer(jobQueue);
+	free(workArgs);
 	free(workerThreads);
 	close(pipeMW[0]); 
 	close(pipeMW[1]);
@@ -379,35 +376,34 @@ static void* workFunc(void* args){
 	char* command = malloc(COMMLENGTH*sizeof(char));
 	char* tokComm;
 	char* token;
-	char* pathname;
+	char* pathname = malloc(COMMLENGTH*sizeof(char));
 	int flags;
 	void* sentBuf;
 	unsigned long sentSize; 
 	unsigned long readSize;
 	list* listOfFiles = NULL;
 	elem* current;
-	storedFile* tmp;
 	int N;
 	unsigned long writeSize;
 	time_t currTime = time(NULL);
 	double now = 0;
-	char* writeFileContent;
+	char* writeFileContent = NULL;
 	char sizeStr[BUFFERSIZE];
 	char* strtokState = NULL;
-	char* errorString = NULL;
+	int errCopy;
 	
 	//messages from clients are like "opcode arguments"
 	//strtok_r is used to retrieve the arguments
 	while(true){
-		printf("entro nel while\n");
 		fdString = NULL;
 		strtokState = NULL;
-		if(dequeueBuffer(commands, &fdString) != 0){
+		
+		if((fdString = dequeueBuffer(commands)) == NULL){
 			perror("dequeue");
 			exit(EXIT_FAILURE);		
 		}
-		printf("ho scaricato\n");
 		sscanf(fdString, "%d", &fd_client);
+		free(fdString);
 		if(fd_client == -1){
 			fdString = NULL;
 			break;
@@ -418,23 +414,24 @@ static void* workFunc(void* args){
 		}
 		tokComm = command;
 		token = strtok_r(tokComm, " ", &strtokState);
-		printf("command %s\n", command);
+		if(token == NULL){
+			continue;
+		}
 		if(token != NULL){
 			sscanf(token, "%d", (int*) &op);
-			printf("%d\n", op);
-			printf("arrivato\n");
 			switch(op){
 				//OPEN
 				case OPEN: 
-					memset(pathname, 0, UNIX_PATH_MAX);
+					memset(pathname, 0, COMMLENGTH);
 					token = strtok_r(NULL, " ", &strtokState);
-					pathname = token;
+					sscanf(token, "%s", pathname);
 					flags = 0;
 					token = strtok_r(NULL, " ", &strtokState);
 					sscanf(token, "%d", &flags);
 					err = storageOpenFile(storage, pathname, flags, fd_client);
-					memset(returnStr, 0, 32);
-					snprintf(returnStr, 32, "%d", err);
+					errCopy = errno;
+					memset(returnStr, 0, BUFFERSIZE);
+					snprintf(returnStr, 4, "%d", err);
 					if((writen(fd_client, (void*) returnStr, strlen(returnStr) + 1)) <= 0){
 						exit(EXIT_FAILURE);
 					}
@@ -446,17 +443,13 @@ static void* workFunc(void* args){
 							break;
 						
 						case -1:
-							memset(errorString, 0, 32);
-							snprintf(errorString, 32, "%d", errno);
-							if(writen(fd_client, (void *)errorString, 32) == -1){
+							if((writen(fd_client, &errCopy, sizeof(int))) <= 0){
 								exit(EXIT_FAILURE);
 							}
 							break;
 							
 						case -2:			
-							memset(errorString, 0, 32);
-							snprintf(errorString, 32, "%d", errno);
-							if(writen(fd_client, (void *)errorString, 32) == -1){
+							if((writen(fd_client, &errCopy, sizeof(int))) <= 0){
 								exit(EXIT_FAILURE);
 							}
 							exit(EXIT_FAILURE);
@@ -473,12 +466,13 @@ static void* workFunc(void* args){
 				case READ: 
 					sentBuf = NULL;
 					sentSize = 0;
-					memset(pathname, 0, UNIX_PATH_MAX);
+					memset(pathname, 0, COMMLENGTH);
 					token = strtok_r(NULL, " ", &strtokState);
-					pathname = token;
+					sscanf(token, "%s", pathname);
 					err = storageReadFile(storage, pathname, &sentBuf, &sentSize, fd_client);
-					memset(returnStr, 0, 32);
-					snprintf(returnStr, 32, "%d", err);
+					errCopy = errno;
+					memset(returnStr, 0, 4);
+					snprintf(returnStr, 4, "%d", err);
 					if((writen(fd_client, (void*) returnStr, strlen(returnStr) + 1)) <= 0){
 						exit(EXIT_FAILURE);
 					}
@@ -490,33 +484,31 @@ static void* workFunc(void* args){
 							break;
 						
 						case -1:
-							memset(errorString, 0, 32);
-							snprintf(errorString, 32, "%d", errno);
-							if(writen(fd_client, (void*) errorString, 32) == -1){
+							if((writen(fd_client, &errCopy, sizeof(int))) <= 0){
 								exit(EXIT_FAILURE);
 							}
 							break;
-							
+														
 						case -2:				
-							memset(errorString, 0, 32);
-							snprintf(errorString, 32, "%d", errno);
-							if(writen(fd_client, (void*) errorString, 32) == -1){
+							if((writen(fd_client, &errCopy, sizeof(int))) <= 0){
 								exit(EXIT_FAILURE);
 							}
 							exit(EXIT_FAILURE);
 					
 					}
-					memset(sizeStr, 0, BUFFERSIZE);
-					snprintf(sizeStr, BUFFERSIZE, "%lu", sentSize);
-					if((writen(fd_client, (void*) sizeStr, BUFFERSIZE)) <= 0){
-						exit(EXIT_FAILURE);
-					}
-					if(sentSize != 0){
-						if((writen(fd_client, (void*) sentBuf, sentSize)) <= 0){
+					if(sentBuf != NULL){
+						memset(sizeStr, 0, BUFFERSIZE);
+						snprintf(sizeStr, BUFFERSIZE, "%lu", sentSize);
+						if((writen(fd_client, (void*) sizeStr, BUFFERSIZE)) <= 0){
 							exit(EXIT_FAILURE);
 						}
+						if(sentSize != 0){
+							if((writen(fd_client, (void*) sentBuf, sentSize)) <= 0){
+								exit(EXIT_FAILURE);
+							}
+						}
+						free(sentBuf);
 					}
-					free(sentBuf);
 					memset(pipeBuff, 0, BUFFERSIZE);
 					snprintf(pipeBuff, BUFFERSIZE, "%d", fd_client);
 					if(writen(pOut, (void*) pipeBuff, BUFFERSIZE) == -1){
@@ -531,8 +523,10 @@ static void* workFunc(void* args){
 					token = strtok_r(NULL, " ", &strtokState);
 					sscanf(token, "%d", &N);
 					err = storageReadNFiles(storage, N, &listOfFiles, fd_client);
-					memset(returnStr, 0, 32);
-					snprintf(returnStr, 32, "%d", err);
+					errCopy = errno;
+					printf("errno dopo readN %d\n", errCopy);
+					memset(returnStr, 0, BUFFERSIZE);
+					snprintf(returnStr, 4, "%d", err);
 					if((writen(fd_client, (void*) returnStr, strlen(returnStr) + 1)) <= 0){
 						exit(EXIT_FAILURE);
 					}
@@ -544,58 +538,71 @@ static void* workFunc(void* args){
 							break;
 						
 						case -1:
-							memset(errorString, 0, 32);
-							snprintf(errorString, 32, "%d", errno);
-							if(writen(fd_client, (void*) errorString, 32) == -1){
+							if((writen(fd_client, &errCopy, sizeof(int))) <= 0){
 								exit(EXIT_FAILURE);
 							}
 							break;
 							
 						case -2:				
-							memset(errorString, 0, 32);
-							snprintf(errorString, 32, "%d", errno);
-							if(writen(fd_client, (void*) errorString, 32) == -1){
+							if((writen(fd_client, &errCopy, sizeof(int))) <= 0){
 								exit(EXIT_FAILURE);
 							}
+							break;
+							
 							exit(EXIT_FAILURE);
 					
 					}
-					memset(sizeStr, 0, BUFFERSIZE);
-					snprintf(sizeStr, BUFFERSIZE, "%d", elemsNumber(listOfFiles));
-					if((writen(fd_client, (void*) sizeStr, BUFFERSIZE)) <= 0){
-						exit(EXIT_FAILURE);
-					}
-					int nFiles = elemsNumber(listOfFiles);
-					int j = nFiles;
-					current = getHead(listOfFiles);
-					tmp = current->info;
-					readSize = 0;
-					while(j > 0){
-						readSize = readSize + tmp->size;
-						memset(returnStr, 0, BUFFERSIZE);
-						snprintf(returnStr, BUFFERSIZE, "%s", tmp->name);
-						if((writen(fd_client, (void*) returnStr, BUFFERSIZE)) <= 0){
-							exit(EXIT_FAILURE);
-						}
+					if(listOfFiles != NULL){
 						memset(sizeStr, 0, BUFFERSIZE);
-						snprintf(sizeStr, BUFFERSIZE, "%lu", tmp->size);
+						snprintf(sizeStr, BUFFERSIZE, "%d", elemsNumber(listOfFiles));
 						if((writen(fd_client, (void*) sizeStr, BUFFERSIZE)) <= 0){
 							exit(EXIT_FAILURE);
 						}
-						if(tmp->size != 0){
-							if((writen(fd_client, (void*) tmp->content, tmp->size)) <= 0){
+						int nFiles = elemsNumber(listOfFiles);
+						int j = nFiles;
+						
+						readSize = 0;
+						while(j > 0){
+							if(listOfFiles != NULL){
+								current = popHead(listOfFiles);
+							}
+							
+							//name length
+							memset(sizeStr, 0, BUFFERSIZE);
+							snprintf(sizeStr, BUFFERSIZE, "%d", (int) (strlen(current->info)+1));
+							
+							if((writen(fd_client, (void*) sizeStr, BUFFERSIZE)) <= 0){
 								exit(EXIT_FAILURE);
 							}
+							readSize = readSize + current->size;
+							
+							memset(returnStr, 0, BUFFERSIZE);
+							snprintf(returnStr, BUFFERSIZE, "%s", current->info);
+							if((writen(fd_client, (void*) returnStr, BUFFERSIZE)) <= 0){
+								exit(EXIT_FAILURE);
+							}
+							memset(sizeStr, 0, BUFFERSIZE);
+							snprintf(sizeStr, BUFFERSIZE, "%lu", current->size);
+							if((writen(fd_client, (void*) sizeStr, BUFFERSIZE)) <= 0){
+								exit(EXIT_FAILURE);
+							}
+							if(current->size != 0){
+								if((writen(fd_client, (void*) current->data, current->size)) <= 0){
+									exit(EXIT_FAILURE);
+								}
+							}
+							current = current->next;
+							j--;
+						
 						}
-						current = current->next;
-						tmp = current->info;
-						j--;
-					
+						if(listOfFiles != NULL){
+							freeList(listOfFiles, (void*)freeFile);
+						}
+						
+						currTime = time(NULL);
+						now = fabs(difftime(initTime, currTime));
+						LOG("[%d] Thread %d: readNFile : Number of read files: %d. Read size: %lu\n", (int) now, (int) pthread_self(), nFiles, readSize);
 					}
-					freeList(listOfFiles);
-					currTime = time(NULL);
-					now = fabs(difftime(initTime, currTime));
-					LOG("[%d] Thread %d: readNFile :: Number of read files: %d. Read size: %lu\n", (int) now, (int) pthread_self(), nFiles, readSize);
 					memset(pipeBuff, 0, BUFFERSIZE);
 					snprintf(pipeBuff, BUFFERSIZE, "%d", fd_client);
 					if(writen(pOut, (void*) pipeBuff, BUFFERSIZE) == -1){
@@ -613,22 +620,23 @@ static void* workFunc(void* args){
 					token = strtok_r(NULL, " ", &strtokState);
 					sscanf(token, "%lu", &writeSize);
 					if(writeSize != 0){
-						if((writeFileContent = malloc(writeSize * sizeof(char))) == NULL){
+						if((writeFileContent = calloc((writeSize+1), sizeof(char))) == NULL){
 							exit(EXIT_FAILURE);
 						} 
-						memset(writeFileContent, 0, writeSize+1);
+						memset(writeFileContent, 0, writeSize + 1);
 						if((readn(fd_client, (void*) writeFileContent, writeSize)) <= 0){
 							exit(EXIT_FAILURE);		
 						}
 					
 					}
 					err = storageWriteFile(storage, pathname, writeFileContent, writeSize, &listOfFiles, fd_client);
+					errCopy = errno;
 					free(writeFileContent);
-					memset(returnStr, 0, 32);
-					snprintf(returnStr, 32, "%d", err);
+					memset(returnStr, 0, 4);
+					snprintf(returnStr, 4, "%d", err);
 					currTime = time(NULL);
 					now = fabs(difftime(initTime, currTime));
-					LOG("[%d] Thread %d: writeFile %s exited with code: %d\n. Write size: %lu\n", (int) now, (int) pthread_self(), pathname, err, writeSize);
+					LOG("[%d] Thread %d: writeFile %s exited with code: %d. Write size: %lu\n", (int) now, (int) pthread_self(), pathname, err, writeSize);
 					if((writen(fd_client, (void*) returnStr, strlen(returnStr) + 1)) <= 0){
 						exit(EXIT_FAILURE);
 					}
@@ -637,17 +645,13 @@ static void* workFunc(void* args){
 							break;
 						
 						case -1:
-							memset(errorString, 0, 32);
-							snprintf(errorString, 32, "%d", errno);
-							if(writen(fd_client, (void*) errorString, 32) == -1){
+							if((writen(fd_client, &errCopy, sizeof(int))) <= 0){
 								exit(EXIT_FAILURE);
 							}
 							break;
 							
 						case -2:				
-							memset(errorString, 0, 32);
-							snprintf(errorString, 32, "%d", errno);
-							if(writen(fd_client, (void*) errorString, 32) == -1){
+							if((writen(fd_client, &errCopy, sizeof(int))) <= 0){
 								exit(EXIT_FAILURE);
 							}
 							exit(EXIT_FAILURE);
@@ -659,31 +663,47 @@ static void* workFunc(void* args){
 						exit(EXIT_FAILURE);
 					}
 					int n = elemsNumber(listOfFiles);
-					current = getHead(listOfFiles);
-					tmp = current->info;
 					while(n > 0){
-						memset(returnStr, 0, BUFFERSIZE);
-						snprintf(returnStr, BUFFERSIZE, "%s", tmp->name);
-						if((writen(fd_client, (void*) returnStr, BUFFERSIZE)) <= 0){
-							exit(EXIT_FAILURE);
+						if(listOfFiles != NULL){
+							current = popHead(listOfFiles);
 						}
+						
+						//name length
 						memset(sizeStr, 0, BUFFERSIZE);
-						snprintf(sizeStr, BUFFERSIZE, "%lu", tmp->size);
+						snprintf(sizeStr, BUFFERSIZE, "%d", (int) (strlen(current->info)+1));
+						
 						if((writen(fd_client, (void*) sizeStr, BUFFERSIZE)) <= 0){
 							exit(EXIT_FAILURE);
 						}
-						if((writen(fd_client, (void*) tmp->content, tmp->size)) <= 0){
+						
+						//file name
+						memset(returnStr, 0, BUFFERSIZE);
+						snprintf(returnStr, BUFFERSIZE, "%s", current->info);
+						
+						if((writen(fd_client, (void*) returnStr, BUFFERSIZE)) <= 0){
+							exit(EXIT_FAILURE);
+						}
+						
+						//file size
+						memset(sizeStr, 0, BUFFERSIZE);
+						snprintf(sizeStr, BUFFERSIZE, "%lu", current->size);
+						if((writen(fd_client, (void*) sizeStr, BUFFERSIZE)) <= 0){
+							exit(EXIT_FAILURE);
+						}
+						
+						//file content
+						if((writen(fd_client, (void*) current->data, current->size)) <= 0){
 							exit(EXIT_FAILURE);
 						}
 						currTime = time(NULL);
 						now = fabs(difftime(initTime, currTime));
-						LOG("[%d] Thread %d: writeFile %s: a victim has been chosen. Victim name: %s Victim size: %lu\n", (int) now, (int) pthread_self(), pathname, tmp->name, tmp->size);
-						current = current->next;
-						tmp = current->info;
+						LOG("[%d] Thread %d: writeFile %s: a victim has been chosen. Victim name: %s Victim size: %lu\n", (int) now, (int) pthread_self(), pathname, current->info, current->size);
+						freeElem(current);
 						n--;
 					
 					}
-					freeList(listOfFiles);
+					free(listOfFiles);
+					
 					memset(pipeBuff, 0, BUFFERSIZE);
 					snprintf(pipeBuff, BUFFERSIZE, "%d", fd_client);
 					if(writen(pOut, (void*) pipeBuff, BUFFERSIZE) == -1){
@@ -710,13 +730,17 @@ static void* workFunc(void* args){
 						}
 					
 					}
+					if(listOfFiles != NULL){
+						freeList(listOfFiles, (void*)freeElem);
+					}
 					err = storageAppendFile(storage, pathname, writeFileContent, writeSize, &listOfFiles, fd_client);
+					errCopy = errno;
 					free(writeFileContent);
-					memset(returnStr, 0, 32);
-					snprintf(returnStr, 32, "%d", err);
+					memset(returnStr, 0, 4);
+					snprintf(returnStr, 4, "%d", err);
 					currTime = time(NULL);
 					now = fabs(difftime(initTime, currTime));
-					LOG("[%d] Thread %d: appendToFile %s exited with code: %d\n. Write size: %lu\n", (int) now, (int) pthread_self(), pathname, err, writeSize);
+					LOG("[%d] Thread %d: appendToFile %s exited with code: %d. Write size: %lu\n", (int) now, (int) pthread_self(), pathname, err, writeSize);
 					if((writen(fd_client, (void*) returnStr, strlen(returnStr) + 1)) <= 0){
 						exit(EXIT_FAILURE);
 					}
@@ -725,17 +749,13 @@ static void* workFunc(void* args){
 							break;
 						
 						case -1:
-							memset(errorString, 0, 32);
-							snprintf(errorString, 32, "%d", errno);
-							if(writen(fd_client, (void*) errorString, 32) == -1){
+							if((writen(fd_client, &errCopy, sizeof(int))) <= 0){
 								exit(EXIT_FAILURE);
 							}
 							break;
 							
 						case -2:				
-							memset(errorString, 0, 32);
-							snprintf(errorString, 32, "%d", errno);
-							if(writen(fd_client, (void*) errorString, 32) == -1){
+							if((writen(fd_client, &errCopy, sizeof(int))) <= 0){
 								exit(EXIT_FAILURE);
 							}
 							exit(EXIT_FAILURE);
@@ -748,30 +768,30 @@ static void* workFunc(void* args){
 					}
 					int a = elemsNumber(listOfFiles);
 					current = getHead(listOfFiles);
-					tmp = current->info;
 					while(a > 0){
 						memset(returnStr, 0, BUFFERSIZE);
-						snprintf(returnStr, BUFFERSIZE, "%s", tmp->name);
+						snprintf(returnStr, BUFFERSIZE, "%s", current->info);
 						if((writen(fd_client, (void*) returnStr, BUFFERSIZE)) <= 0){
 							exit(EXIT_FAILURE);
 						}
 						memset(sizeStr, 0, BUFFERSIZE);
-						snprintf(sizeStr, BUFFERSIZE, "%lu", tmp->size);
+						snprintf(sizeStr, BUFFERSIZE, "%lu", current->size);
 						if((writen(fd_client, (void*) sizeStr, BUFFERSIZE)) <= 0){
 							exit(EXIT_FAILURE);
 						}
-						if((writen(fd_client, (void*) tmp->content, tmp->size)) <= 0){
+						if((writen(fd_client, (void*) current->data, current->size)) <= 0){
 							exit(EXIT_FAILURE);
 						}
 						currTime = time(NULL);
 						now = fabs(difftime(initTime, currTime));
-						LOG("[%d] Thread %d: appendToFile %s: a victim has been chosen. Victim name: %s Victim size: %lu\n", (int) now, (int) pthread_self(), pathname, tmp->name, tmp->size);
+						LOG("[%d] Thread %d: appendToFile %s: a victim has been chosen. Victim name: %s Victim size: %lu\n", (int) now, (int) pthread_self(), pathname, current->info, current->size);
 						current = current->next;
-						tmp = current->info;
 						a--;
 					
 					}
-					freeList(listOfFiles);
+					if(listOfFiles != NULL){
+						freeList(listOfFiles, (void*)freeFile);
+					}
 					memset(pipeBuff, 0, BUFFERSIZE);
 					snprintf(pipeBuff, BUFFERSIZE, "%d", fd_client);
 					if(writen(pOut, (void*) pipeBuff, BUFFERSIZE) == -1){
@@ -785,8 +805,9 @@ static void* workFunc(void* args){
 					memset(pathname, 0, COMMLENGTH);
 					sscanf(token, "%s", pathname);
 					err = storageLockFile(storage, pathname, fd_client);
-					memset(returnStr, 0, 32);
-					snprintf(returnStr, 32, "%d", err);
+					errCopy = errno;
+					memset(returnStr, 0, 4);
+					snprintf(returnStr, 4, "%d", err);
 					currTime = time(NULL);
 					now = fabs(difftime(initTime, currTime));
 					LOG("[%d] Thread %d: lockFile %s exited with code: %d\n", (int) now, (int) pthread_self(), pathname, err);
@@ -798,17 +819,13 @@ static void* workFunc(void* args){
 							break;
 						
 						case -1:
-							memset(errorString, 0, 32);
-							snprintf(errorString, 32, "%d", errno);
-							if(writen(fd_client, (void*) errorString, 32) == -1){
+							if((writen(fd_client, &errCopy, sizeof(int))) <= 0){
 								exit(EXIT_FAILURE);
 							}
 							break;
 							
 						case -2:				
-							memset(errorString, 0, 32);
-							snprintf(errorString, 32, "%d", errno);
-							if(writen(fd_client, (void*) errorString, 32) == -1){
+							if((writen(fd_client, &errCopy, sizeof(int))) <= 0){
 								exit(EXIT_FAILURE);
 							}
 							exit(EXIT_FAILURE);
@@ -826,8 +843,9 @@ static void* workFunc(void* args){
 					memset(pathname, 0, COMMLENGTH);
 					sscanf(token, "%s", pathname);
 					err = storageUnlockFile(storage, pathname, fd_client);
-					memset(returnStr, 0, 32);
-					snprintf(returnStr, 32, "%d", err);
+					errCopy = errno;
+					memset(returnStr, 0, 4);
+					snprintf(returnStr, 4, "%d", err);
 					currTime = time(NULL);
 					now = fabs(difftime(initTime, currTime));
 					LOG("[%d] Thread %d: unlockFile %s exited with code: %d\n", (int) now, (int) pthread_self(), pathname, err);
@@ -839,17 +857,13 @@ static void* workFunc(void* args){
 							break;
 						
 						case -1:
-							memset(errorString, 0, 32);
-							snprintf(errorString, 32, "%d", errno);
-							if(writen(fd_client, (void*) errorString, 32) == -1){
+							if((writen(fd_client, &errCopy, sizeof(int))) <= 0){
 								exit(EXIT_FAILURE);
 							}
 							break;
 							
 						case -2:				
-							memset(errorString, 0, 32);
-							snprintf(errorString, 32, "%d", errno);
-							if(writen(fd_client, (void*) errorString, 32) == -1){
+							if((writen(fd_client, &errCopy, sizeof(int))) <= 0){
 								exit(EXIT_FAILURE);
 							}
 							exit(EXIT_FAILURE);
@@ -863,15 +877,14 @@ static void* workFunc(void* args){
 					break;
 				//CLOSE	
 				case CLOSE: 
-					memset(pathname, 0, UNIX_PATH_MAX);
+					memset(pathname, 0, COMMLENGTH);
 					token = strtok_r(NULL, " ", &strtokState);
-					pathname = token;
-					flags = 0;
+					sscanf(token, "%s", pathname);
 					token = strtok_r(NULL, " ", &strtokState);
-					sscanf(token, "%d", &flags);
 					err = storageCloseFile(storage, pathname, fd_client);
-					memset(returnStr, 0, 32);
-					snprintf(returnStr, 32, "%d", err);
+					errCopy = errno;
+					memset(returnStr, 0, 4);
+					snprintf(returnStr, 4, "%d", err);
 					currTime = time(NULL);
 					now = fabs(difftime(initTime, currTime));
 					LOG("[%d] Thread %d: closeFile %s exited with code: %d\n", (int) now, (int) pthread_self(), pathname, err);
@@ -883,17 +896,13 @@ static void* workFunc(void* args){
 							break;
 						
 						case -1:
-							memset(errorString, 0, 32);
-							snprintf(errorString, 32, "%d", errno);
-							if(writen(fd_client, (void *)errorString, 32) == -1){
+							if((writen(fd_client, &errCopy, sizeof(int))) <= 0){
 								exit(EXIT_FAILURE);
 							}
 							break;
 							
 						case -2:				
-							memset(errorString, 0, 32);
-							snprintf(errorString, 32, "%d", errno);
-							if(writen(fd_client, (void *)errorString, 32) == -1){
+							if((writen(fd_client, &errCopy, sizeof(int))) <= 0){
 								exit(EXIT_FAILURE);
 							}
 							exit(EXIT_FAILURE);
@@ -907,15 +916,13 @@ static void* workFunc(void* args){
 					break;
 				//REMOVE	
 				case REMOVE: 
-					memset(pathname, 0, UNIX_PATH_MAX);
+					memset(pathname, 0, COMMLENGTH);
 					token = strtok_r(NULL, " ", &strtokState);
-					pathname = token;
-					flags = 0;
-					token = strtok_r(NULL, " ", &strtokState);
-					sscanf(token, "%d", &flags);
-					err = storageCloseFile(storage, pathname, fd_client);
-					memset(returnStr, 0, 32);
-					snprintf(returnStr, 32, "%d", err);
+					sscanf(token, "%s", pathname);
+					err = storageRemoveFile(storage, pathname, fd_client);
+					errCopy = errno;
+					memset(returnStr, 0, 4);
+					snprintf(returnStr, 4, "%d", err);
 					currTime = time(NULL);
 					now = fabs(difftime(initTime, currTime));
 					LOG("[%d] Thread %d: removeFile %s exited with code: %d\n", (int) now, (int) pthread_self(), pathname, err);
@@ -927,17 +934,13 @@ static void* workFunc(void* args){
 							break;
 						
 						case -1:
-							memset(errorString, 0, 32);
-							snprintf(errorString, 32, "%d", errno);
-							if(writen(fd_client, (void *)errorString, 32) == -1){
+							if((writen(fd_client, &errCopy, sizeof(int))) <= 0){
 								exit(EXIT_FAILURE);
 							}
 							break;
 							
 						case -2:				
-							memset(errorString, 0, 32);
-							snprintf(errorString, 32, "%d", errno);
-							if(writen(fd_client, (void *)errorString, 32) == -1){
+							if((writen(fd_client, &errCopy, sizeof(int))) <= 0){
 								exit(EXIT_FAILURE);
 							}
 							exit(EXIT_FAILURE);
@@ -952,7 +955,6 @@ static void* workFunc(void* args){
 					
 				//CLOSECONN
 				case CLOSECONN:
-					printf("AOO\n");
 					memset(pipeBuff, 0, BUFFERSIZE);
 					snprintf(pipeBuff, BUFFERSIZE, "%d", -1);
 					if(writen(pOut, (void*) pipeBuff, BUFFERSIZE) == -1){
@@ -962,9 +964,12 @@ static void* workFunc(void* args){
 										
 			}
 			
+			
 		}
-		fdString = NULL;
+		
 	
 	}
+	free(command);
+	free(pathname);
 	return NULL;
 }

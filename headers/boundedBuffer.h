@@ -7,7 +7,7 @@ boundedBuffer* initBuffer(int size);
 
 int enqueueBuffer(boundedBuffer* buf, char* job);
 
-int dequeueBuffer(boundedBuffer* buf, char** retjob);
+char* dequeueBuffer(boundedBuffer* buf);
 
 int cleanBuffer(boundedBuffer* buf);
 

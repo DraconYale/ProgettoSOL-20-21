@@ -2,6 +2,7 @@
 #define FUNCTIONS_H_DEFINED
 
 #include <unistd.h>
+#include <stdio.h>
 
 #define O_CREATE 1
 #define O_LOCK 2
@@ -24,7 +25,7 @@ static inline ssize_t  /* Read "n" bytes from a descriptor */
 readn(int fd, void *ptr, size_t n) {  
    size_t   nleft;
    ssize_t  nread;
- 
+   
    nleft = n;
    while (nleft > 0) {
      if((nread = read(fd, ptr, nleft)) < 0) {

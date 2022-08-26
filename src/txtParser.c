@@ -33,6 +33,8 @@ txtFile* txtInit(){
 
 int cleanConf(txtFile* conf){
 	free(conf->pathToSocket);
+	free(conf->logPath);
+	free(conf);
 	return 0;
 
 }

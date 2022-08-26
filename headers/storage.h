@@ -18,7 +18,7 @@ typedef struct storedFile{
 
 typedef struct storage{
 
-	hashTable* files;			//where files are stored
+	icl_hash_t* files;			//where files are stored
 	int repPolicy;				//replacement policy used
 	locker* mux;				//mutex used for read/write ops
 	list* filesFIFOQueue;			//list of files used for FIFO replacement
@@ -33,6 +33,8 @@ typedef struct storage{
 	int victimNumb;				//number of victims
 
 }storage;
+
+void freeFile(storedFile* file);
 
 storage* storageInit(int maxFiles, unsigned long maxMB, int repPolicy);
 
@@ -56,7 +58,7 @@ int storageUnlockFile(storage* storage, char* name, int client);
 
 int storageCloseFile(storage* storage, char* filename, int client);
 
-int storageRemoveFile(storage* storage, char* name, unsigned long* bytesR, int client);
+int storageRemoveFile(storage* storage, char* name, int client);
 
 int freeStorage(storage* storage);
 

@@ -5,6 +5,16 @@
 
 #include <list.h>
 
+void freeElem(elem* elem){
+	if(elem->info != NULL){
+		free(elem->info);
+	}
+	if(elem->data != NULL){
+		free(elem->data);
+	}
+	free(elem);
+}
+
 list* initList(){
 
 	list* newList;
@@ -50,16 +60,61 @@ void printList(list* list){
 
 }
 
-elem* appendList(list* list, void* content){
+elem* appendList(list* list, char* name){
+
+	if(list == NULL || name == NULL){
+		return NULL;
+	}
+	elem* addedElem;
+	if((addedElem = malloc(sizeof(elem))) == NULL){
+		return NULL;
+	}
+	addedElem->info = malloc(strlen(name)*sizeof(char)+1);
+	strncpy(addedElem->info, name, strlen(name)+1);
+	addedElem->data = NULL;
+	addedElem->size = 0;
+	addedElem->prev = NULL;
+	addedElem->next = NULL;
+
+	if(list->elemNumber == 0) {
+		list->head = addedElem;
+		list->tail = addedElem;
+		list->elemNumber++;
+	}
+	else{
+		addedElem->prev = list->tail;
+		list->tail->next = addedElem;
+		list->tail = addedElem;
+		list->elemNumber++;
+	}
+	return addedElem;
+}
+
+elem* appendListCont(list* list, char* name, int nameLength, void* content, unsigned long contentSize){
 
 	if(list == NULL || content == NULL){
 		return NULL;
 	}
 	elem* addedElem = NULL;
+	char* tmpName = NULL;
+	void* data = NULL;
 	if((addedElem = malloc(sizeof(elem))) == NULL){
 		return NULL;
 	}
-	addedElem->info = content;
+	if((tmpName = malloc(nameLength*sizeof(char)+1)) == NULL){
+		return NULL;
+	}
+	strncpy(tmpName, name, nameLength+1);
+	
+	if((data = malloc(contentSize)) == NULL){
+		return NULL;
+	}
+	memset(data, 0, contentSize);
+	memcpy(data, content, contentSize);
+	
+	addedElem->info = tmpName;
+	addedElem->size = contentSize;
+	addedElem->data = data;
 	addedElem->prev = NULL;
 	addedElem->next = NULL;
 
@@ -143,29 +198,44 @@ int containsList(list* list, char* str){
 	return 0;
 }
 
-int removeList(list* list, void* str){
+int removeList(list* list, void* str, void(*free)(void*)){
 	if (list == NULL || str == NULL){
 		errno = EINVAL;
 		return -1;
 	}
-	elem* current = list->head;
-	char* tmp;
+	elem* current = getHead(list);
 	while(current != NULL){
-		tmp = current->info;
-		if(strcmp(tmp, str) != 0){
+		if(strcmp(current->info , (char*)str) != 0){
 			current = current->next;
+			
 		}
 		else{
-			if (current->next == NULL){
-				list->tail = current->prev;
-			}
-			if (current->prev == NULL){
+			if(strcmp(current->info , list->head->info) == 0){
 				list->head = current->next;
+				if(list->head != NULL){
+					list->head->prev = NULL;
+				}
+				list->elemNumber--;
 			}
-			current->prev->next = current->next;
-			current->next->prev = current->prev;
-			free(current);
-			list->elemNumber--;
+			else if(strcmp(current->info , list->tail->info) == 0){
+				list->tail = current->prev;
+				if(list->tail != NULL){
+					list->tail->next = NULL;
+				}
+				list->elemNumber--;
+			}else{
+				current->prev->next = current->next;
+				current->next->prev = current->prev;
+				list->elemNumber--;		
+			
+			}
+			if(list->elemNumber == 0){
+				list->head = NULL;
+				list->tail = NULL;
+			
+			}
+			
+			(*free)(current);
 			return 0;
 		}
 	}
@@ -181,11 +251,19 @@ elem* nextList(list* list, elem* elem){
 	}
 }
 
+elem* prevList(list* list, elem* elem){
+	if(list == NULL || elem == NULL){
+		return NULL;
+	}
+	else{
+		return elem->prev;
+	}
+}
+
 
 int elemsNumber(list* list){
-	if (list == NULL){
-		errno = EINVAL;
-		return -1;
+	if(list == NULL){
+		return 0;
 	}
 	elem* current = list->head;
 	int count = 0;
@@ -197,13 +275,15 @@ int elemsNumber(list* list){
 }
 
 
-void freeList(list* list){
-    	elem* tmp;
-	elem* curr = list->head;
-	while(curr != NULL){
-		tmp = curr;
-		curr = curr->next;
-		free(tmp);
+void freeList(list* list, void(*freeFunc)(void*)){
+	if(list != NULL){
+	    	elem* tmp;
+		elem* curr = list->head;
+		while(curr != NULL){
+			tmp = curr;
+			curr = curr->next;
+			(*freeFunc)(tmp);
+		}
+		free(list);
 	}
-	free(list);
 }

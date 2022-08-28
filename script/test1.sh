@@ -14,15 +14,15 @@ touch files/6.txt
 touch files/7.txt
 touch files/8.txt
 touch files/9.txt
-head -c 10MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold  > files/1.txt
-head -c 20MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold  > files/2.txt
-head -c 30MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold  > files/3.txt
-head -c 40MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold  > files/4.txt
-head -c 50MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold  > files/5.txt
-head -c 60MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold  > files/6.txt
-head -c 70MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold  > files/7.txt
-head -c 80MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold  > files/8.txt
-head -c 90MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold  > files/9.txt
+head -c 1MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold  > files/1.txt
+head -c 2MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold  > files/2.txt
+head -c 3MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold  > files/3.txt
+head -c 5MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold  > files/4.txt
+head -c 6MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold  > files/5.txt
+head -c 7MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold  > files/6.txt
+head -c 8MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold  > files/7.txt
+head -c 8MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold  > files/8.txt
+head -c 8MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold  > files/9.txt
 
 echo -e "\nTest files created"
 

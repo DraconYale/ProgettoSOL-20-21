@@ -55,8 +55,7 @@ test3:	bin/server bin/client
 	@chmod +x script/test3Clients.sh
 	script/test3.sh
 
-clean:
-cleanall: 
+clean cleanall: 
 	rm -rf bin/* obj/* test1 test2 test3
 	rm log/test1/*.txt
 	rm log/test2/*.txt

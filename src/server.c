@@ -211,7 +211,6 @@ int main (int argc, char** argv){
 	while(term != 1){
 		//SIGINT or SIGQUIT
 		if(term){
-			printf("term = 1\n");
 			exit(EXIT_SUCCESS);
 		}
 		//SIGHUP
@@ -233,7 +232,6 @@ int main (int argc, char** argv){
 					exit(EXIT_SUCCESS);
 				}
 				if(term){
-					printf("term = 1");
 					exit(EXIT_SUCCESS);
 				}
 				continue;
@@ -525,19 +523,17 @@ static void* workFunc(void* args){
 							exit(EXIT_FAILURE);
 					
 					}
-					if(sentBuf != NULL){
-						memset(sizeStr, 0, BUFFERSIZE);
-						snprintf(sizeStr, BUFFERSIZE, "%lu", sentSize);
-						if((writen(fd_client, (void*) sizeStr, BUFFERSIZE)) <= 0){
+					memset(sizeStr, 0, BUFFERSIZE);
+					snprintf(sizeStr, BUFFERSIZE, "%lu", sentSize);
+					if((writen(fd_client, (void*) sizeStr, BUFFERSIZE)) <= 0){
+						exit(EXIT_FAILURE);
+					}
+					if(sentSize != 0){
+						if((writen(fd_client, (void*) sentBuf, sentSize)) <= 0){
 							exit(EXIT_FAILURE);
 						}
-						if(sentSize != 0){
-							if((writen(fd_client, (void*) sentBuf, sentSize)) <= 0){
-								exit(EXIT_FAILURE);
-							}
-						}
-						free(sentBuf);
 					}
+					free(sentBuf);
 					memset(pipeBuff, 0, BUFFERSIZE);
 					snprintf(pipeBuff, BUFFERSIZE, "%d", fd_client);
 					if(writen(pOut, (void*) pipeBuff, BUFFERSIZE) == -1){
@@ -553,7 +549,6 @@ static void* workFunc(void* args){
 					sscanf(token, "%d", &N);
 					err = storageReadNFiles(storage, N, &listOfFiles, fd_client);
 					errCopy = errno;
-					printf("errno dopo readN %d\n", errCopy);
 					memset(returnStr, 0, BUFFERSIZE);
 					snprintf(returnStr, 4, "%d", err);
 					if((writen(fd_client, (void*) returnStr, strlen(returnStr) + 1)) <= 0){
@@ -582,14 +577,13 @@ static void* workFunc(void* args){
 					
 					}
 					if(listOfFiles != NULL){
-						memset(sizeStr, 0, BUFFERSIZE);
 						snprintf(sizeStr, BUFFERSIZE, "%d", elemsNumber(listOfFiles));
 						if((writen(fd_client, (void*) sizeStr, BUFFERSIZE)) <= 0){
 							exit(EXIT_FAILURE);
 						}
+					
 						int nFiles = elemsNumber(listOfFiles);
-						int j = nFiles;
-						
+						int j = nFiles;	
 						readSize = 0;
 						while(j > 0){
 							if(listOfFiles != NULL){
@@ -620,14 +614,11 @@ static void* workFunc(void* args){
 									exit(EXIT_FAILURE);
 								}
 							}
-							current = current->next;
+							freeElem(current);
 							j--;
 						
 						}
-						if(listOfFiles != NULL){
-							freeList(listOfFiles, (void*)freeFile);
-						}
-						
+						free(listOfFiles);						
 						currTime = time(NULL);
 						now = fabs(difftime(initTime, currTime));
 						LOG("[%d] Thread %lu: readNFile : Number of read files: %d. Read size: %lu\n", (int) now, (unsigned long) pthread_self(), nFiles, readSize);

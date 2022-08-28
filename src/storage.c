@@ -403,8 +403,9 @@ int storageReadNFiles(storage* storage, int N, list** sentFilesList, int client)
 		}
 		return -1;
 	}
-	
+	list* tmpList = initList();
 	while(counter < N && !maxReached){
+		
 		storedFile* kFile = icl_hash_find(storage->files, listElem->info);
 		storedFile* file = NULL;
 		if(readLock(kFile->mux) != 0){
@@ -424,8 +425,9 @@ int storageReadNFiles(storage* storage, int N, list** sentFilesList, int client)
 			if((file->content = malloc(kFile->size)) == NULL){
 				return -2;
 			}
-			memcpy(file->content, kFile->content, kFile->size);
-			if(appendListCont(*sentFilesList, file->name, strlen(file->name), file->content, file->size) == NULL){
+			memcpy(file->content, kFile->content, kFile->size);			
+			
+			if(appendListCont(tmpList, file->name, strlen(file->name), file->content, file->size) == NULL){
 				if(readUnlock(kFile->mux) != 0){
 					return -2;
 				}
@@ -435,6 +437,7 @@ int storageReadNFiles(storage* storage, int N, list** sentFilesList, int client)
 				freeFile(file);
 				return -1;
 			}
+			freeFile(file);
 			kFile->lastAccess = time(NULL);
 			if(readUnlock(kFile->mux) != 0){
 				return -2;
@@ -445,11 +448,6 @@ int storageReadNFiles(storage* storage, int N, list** sentFilesList, int client)
 			if(readUnlock(kFile->mux) != 0){
 				return -2;
 			}
-			if(readUnlock(storage->mux) != 0){
-				return -2;
-			}
-			errno = EEXIST;
-			return -1;
 		}
 		listElem = nextList(storage->filesFIFOQueue, listElem);
 		if(listElem == NULL){
@@ -459,7 +457,8 @@ int storageReadNFiles(storage* storage, int N, list** sentFilesList, int client)
 	if(readUnlock(storage->mux) != 0){
 		return -2;
 	}
-	return counter;
+	*sentFilesList = tmpList;
+	return 0;
 }
 
 //storageWriteFile fails if the file is not "new" or locked by client (file needs to be opened wit O_CREATE and O_LOCK)

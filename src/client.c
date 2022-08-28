@@ -220,7 +220,7 @@ int main(int argc, char** argv){
 	}
 	int opt;
 	int err;
-	while((opt = getopt(argc, argv, "hf:w:W:D:r:R::d:t:l:u:c:p")) != -1){
+	while((opt = getopt(argc, argv, "hf:w:W:D:r:R:d:t:l:u:c:p")) != -1){
 		switch(opt){
 		   case 'h':
 		   	break;
@@ -338,12 +338,13 @@ int main(int argc, char** argv){
 		    			}
 		    			char* ansBuf = NULL;
 		    			size_t readSize = 0;
-		    			if((err = readFile(token, (void**) &ansBuf,&readSize)) != 0)
+		    			if((err = readFile(token, (void**) &ansBuf,&readSize)) != 0){
+		    				break;
+		    			}
 		    			if(dirRead != NULL){
 		    				char file[UNIX_PATH_MAX];
 						strcpy(file,dirRead);
 						strncat(file,token, strlen(token)+1);
-						
 						//create directories for saving files
 						mkdirs(file);
 						FILE* dest;
@@ -377,18 +378,14 @@ int main(int argc, char** argv){
 		    	if(connected){
 		    		int n = 0;
 		    		if(optarg == 0){
-		    			if((err = (readNFiles(0,dirRead))) != 0){
-		    				perror("-R read");
-		    			}
+		    			readNFiles(0,dirRead);
 		    		}
 		    		else{   	
 		    			char* nString = NULL;		
-		    			if(strncmp(optarg, "n=", 2)){
+		    			if(strncmp(optarg, "n=", 3)){
 		    				if((nString = strrchr(optarg, '=')) != NULL){
 		    					if((n = (isNumber(nString+1))) != -1){
-		    						if((err = (readNFiles(n,dirRead))) != 0){
-		    							perror("-R read");
-		    						}
+		    						readNFiles(n,dirRead);
 		    					}
 		    					else{
 		    						errno = EINVAL;
@@ -438,7 +435,6 @@ int main(int argc, char** argv){
 		    			closeFile(token);
 		    			token = strtok_r(NULL, ",", &strtokState);
 		    		}
-		    		//free(files);
 		    		sleep(timeC);
 		    		break;
 		    		
@@ -464,7 +460,6 @@ int main(int argc, char** argv){
 		    			closeFile(token);
 		    			token = strtok_r(NULL, ",", &strtokState);
 		    		}
-		    		//free(files);
 		    		sleep(timeC);
 		    		break;
 		    	

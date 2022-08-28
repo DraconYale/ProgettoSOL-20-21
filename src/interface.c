@@ -124,7 +124,6 @@ int openFile(const char* pathname, int flags){
 		PRINT(setPrint, "openFile %s: fail with error %d\n", pathname, errno);
 		return -1;
 	}
-	
 	sscanf(retString, "%d", &retCode);
 	memset(retString, 0, MAXLEN);
 	switch(retCode){
@@ -247,7 +246,7 @@ readNFiles: client request for N files. If server file count is <N or N<=0 then 
 */
 int readNFiles(int N, const char* dirname){
 
-	if(strlen(dirname) > UNIX_PATH_MAX){
+	if(dirname != NULL && strlen(dirname) > UNIX_PATH_MAX){
 		errno = EINVAL;
 		PRINT(setPrint, "readNFile %d %s: fail with error %d\n", N, dirname, errno);
 		return -1;
@@ -361,7 +360,7 @@ int readNFiles(int N, const char* dirname){
 				strncat(newPath, name, strlen(name)+1);
 				//create directories for saving files
 				mkdirs(newPath);
-
+				writtenBytes = writtenBytes + sizeBuf;
 		
 				FILE* savedFile;
 				if((savedFile = fopen(newPath, "w+")) == NULL){
@@ -458,7 +457,6 @@ int writeFile(const char* pathname, const char* dirname){
 		PRINT(setPrint, "writeFile %s %lu: fail with error %d\n", pathname, fileSize, errno);
 		return -1;
 	}
-	
 	if (fileSize != 0){
 		if (writen(csfd, (void*) fileContent, fileSize) == -1){
 			PRINT(setPrint, "writeFile %s %s: fail with error %d\n", pathname, dirname, errno);

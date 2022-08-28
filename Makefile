@@ -2,6 +2,8 @@ CC = gcc
 CFLAGS += -std=c99 -Wall -g 
 HEADERS = -I ./headers/
 
+all:	bin/server bin/client
+
 .PHONY: all clean cleanall test1 test2 test3
 
 SERVER_OBJ = obj/boundedBuffer.o obj/icl_hash.o obj/list.o obj/locker.o obj/storage.o obj/txtParser.o obj/server.o
@@ -40,8 +42,6 @@ bin/client:	$(CLIENT_OBJ)
 bin/server:	$(SERVER_OBJ)
 	$(CC) $(CFLAGS) $(SERVER_OBJ) -lpthread -o $@
 
-all:	bin/server bin/client
-
 test1:	bin/server bin/client
 	@chmod +x script/test1.sh
 	script/test1.sh
@@ -52,7 +52,7 @@ test2:	bin/server bin/client
 
 test3:	bin/server bin/client
 	@chmod +x script/test3.sh
-	@chmod +x script/test3_aux.sh
+	@chmod +x script/test3Clients.sh
 	script/test3.sh
 
 clean:

@@ -66,7 +66,7 @@ export SERVER_PID
 
 sleep 3s
 
-echo -e "\n[FIFO] Starting clients"
+echo -e "\n[LRU] Starting clients"
 
 #all clients send files (testing replacement algorithm, victims are sent to specified directory) 
 echo -e "\n[LRU] First client"

@@ -7,13 +7,12 @@
 #include <errno.h>
 #include <dirent.h>
 #include <sys/socket.h>
-#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/un.h>
 #include <unistd.h>
 
-#include <functions.h>
 #include <interface.h>
+#include <functions.h>
 
 
 #define MAXLEN 256
@@ -257,18 +256,6 @@ int readNFiles(int N, const char* dirname){
 	int error = 0;
 	unsigned long writtenBytes = 0;
 	unsigned long readBytes = 0;
-	DIR* directory = NULL;
-	bool dirSet = false;
-	char tmpPath[UNIX_PATH_MAX];
-	if(dirname != NULL){
-		if((directory = opendir(dirname)) == NULL){
-			dirSet = false;				//if opendir fails, read files will not be saved in dirname
-		}
-		else{
-			dirSet = true;
-			strcpy(tmpPath, dirname);			
-		}	
-	}
 	
 	char* tmpBuf = calloc(COMMLENGTH, sizeof(char));
 	//request will be parsed by server
@@ -283,9 +270,7 @@ int readNFiles(int N, const char* dirname){
 		return -1;
 	}
 	
-	printf("retString dopo la return: %s\n", retString);
 	sscanf(retString, "%d", &retCode);
-	printf("retCode %d\n", retCode);
 	switch(retCode){
 		
 		case 0:
@@ -363,7 +348,9 @@ int readNFiles(int N, const char* dirname){
 			
 			}
 			readBytes = readBytes + sizeBuf;
-			if(dirSet){
+			if(dirname != NULL){
+				char tmpPath[UNIX_PATH_MAX];
+				strcpy(tmpPath, dirname);
 				if((strlen(dirname)+(strlen(name)) > UNIX_PATH_MAX)){
 					errno = ENAMETOOLONG;
 					PRINT(setPrint, "readNFile %d %s: fail with error %d\n", N, dirname, errno);
@@ -372,6 +359,10 @@ int readNFiles(int N, const char* dirname){
 				char newPath[UNIX_PATH_MAX];
 				strcpy(newPath, tmpPath);
 				strncat(newPath, name, strlen(name)+1);
+				//create directories for saving files
+				mkdirs(newPath);
+
+		
 				FILE* savedFile;
 				if((savedFile = fopen(newPath, "w+")) == NULL){
 					PRINT(setPrint, "readNFile %d %s: fail with error %d\n", N, dirname, errno);
@@ -381,7 +372,6 @@ int readNFiles(int N, const char* dirname){
 					PRINT(setPrint, "readNFile %d %s: fail with error %d\n", N, dirname, errno);
 					return -1;
 				}
-				writtenBytes = writtenBytes + sizeBuf;
 				if(fclose(savedFile) != 0){
 					PRINT(setPrint, "readNFile %d %s: fail with error %d\n", N, dirname, errno);
 					return -1;
@@ -391,13 +381,6 @@ int readNFiles(int N, const char* dirname){
 			readCont = NULL;
 			sizeBuf = 0;
 			j++;
-	
-	}
-	if(dirSet){
-		if(closedir(directory) != 0){
-			PRINT(setPrint, "readNFile %d %s: fail with error %d\n", N, dirname, errno);
-			return -1;
-		}
 	
 	}
 	free(tmpBuf);
@@ -430,18 +413,7 @@ int writeFile(const char* pathname, const char* dirname){
 	int error;
 	unsigned long writtenBytes = 0;
 	unsigned long readBytes = 0;
-	DIR* directory = NULL;
-	bool dirSet = false;
-	char tmpPath[UNIX_PATH_MAX];
-	if(dirname != NULL){
-		if((directory = opendir(dirname)) == NULL){
-			dirSet = false;				//if opendir fails, read files will not be saved in dirname
-		}
-		else{
-			dirSet = true;
-			strcpy(tmpPath, dirname);			
-		}	
-	}
+	
 	
 	//we need to calculate the file's size
 	unsigned long fileSize = 0;
@@ -584,18 +556,23 @@ int writeFile(const char* pathname, const char* dirname){
 				}
 			
 			}
-			if(dirSet){
+			if(dirname != NULL){
+			
+				char tmpPath[UNIX_PATH_MAX];
+				strcpy(tmpPath, dirname);
 				if((strlen(dirname)+(strlen(name)) > UNIX_PATH_MAX)){
 					errno = ENAMETOOLONG;
 					PRINT(setPrint, "writeFile %s %s: fail with error %d\n", pathname, dirname, errno);
 					return -1;
 				}
-				char newPath[(strlen(dirname))+(strlen(name))];
+				char newPath[UNIX_PATH_MAX];
 				strcpy(newPath, tmpPath);
 				strncat(newPath, name, strlen(name)+1);
+				//create directories for saving files
+				mkdirs(newPath);
+		
 				FILE* savedFile;
 				if((savedFile = fopen(newPath, "w+")) == NULL){
-					printf("o dove sono\n");
 					PRINT(setPrint, "writeFile %s %s: fail with error %d\n", pathname, dirname, errno);
 					return -1;
 				}
@@ -606,19 +583,12 @@ int writeFile(const char* pathname, const char* dirname){
 				if(fclose(savedFile) != 0){
 					PRINT(setPrint, "writeFile %s %s: fail with error %d\n", pathname, dirname, errno);
 					return -1;
-				}		
+				}
 			}
 			free(readCont);
 			readCont = NULL;
 			sizeBuf = 0;
 			j++;
-	
-	}
-	if(dirSet){
-		if(closedir(directory) != 0){
-			PRINT(setPrint, "writeFile %s %s: fail with error %d\n", pathname, dirname, errno);
-			return -1;
-		}
 	
 	}
 	free(tmpBuf);
@@ -642,18 +612,6 @@ int appendToFile(const char* pathname, void* buf, size_t size, const char* dirna
 	int error;
 	unsigned long writtenBytes = 0;
 	unsigned long readBytes = 0;
-	DIR* directory = NULL;
-	bool dirSet = false;
-	char tmpPath[UNIX_PATH_MAX];
-	if(dirname != NULL){
-		if((directory = opendir(dirname)) == NULL){
-			dirSet = false;				//if opendir fails, read files will not be saved in dirname
-		}
-		else{
-			dirSet = true;
-			strcpy(tmpPath, dirname);			
-		}	
-	}
 	
 	char* tmpBuf = calloc(COMMLENGTH, sizeof(char));
 	
@@ -707,40 +665,59 @@ int appendToFile(const char* pathname, void* buf, size_t size, const char* dirna
 	char readNumberStr[MAXLEN];
 	int victimNumber = 0;
 	if (readn(csfd, (void*) readNumberStr, MAXLEN) == -1){
-		PRINT(setPrint, "appendToFile %s %s: fail with error %d\n", pathname, dirname, errno);
+		PRINT(setPrint, "writeFile %s %s: fail with error %d\n", pathname, dirname, errno);
 		return -1;
 	}
 	sscanf(readNumberStr, "%d", &victimNumber);
 	int j = 0;
 	char name[MAXLEN];
 	char msg[MAXLEN];
+	char msgSize[MAXLEN];
+	int nameLeng = 0;
 	unsigned long sizeBuf = 0;
 	char* readCont = NULL;
 	while(j < victimNumber){
+			sizeBuf = 0;
+			//name length
+			memset(msg, 0, MAXLEN);
+			if (readn(csfd, (void*) msg, MAXLEN) <= 0){
+				PRINT(setPrint, "appendToFile %s %s: fail with error %d\n", pathname, dirname, errno);
+				return -1;
+			}
+			
+			sscanf(msg, "%d", &nameLeng);
+			
+			//file name
 			memset(name, 0, MAXLEN);
-			if (readn(csfd, (void*) name, MAXLEN) == -1){
+			if (readn(csfd, (void*) name, MAXLEN) <= 0){
 				PRINT(setPrint, "appendToFile %s %s: fail with error %d\n", pathname, dirname, errno);
 				return -1;
 			}
-			memset(msg, 0, 32);
-			if (readn(csfd, (void*) msg, MAXLEN) == -1){
+			
+			//file size
+			memset(msgSize, 0, MAXLEN);
+			if(readn(csfd, (void*) msgSize, MAXLEN) <= 0){
 				PRINT(setPrint, "appendToFile %s %s: fail with error %d\n", pathname, dirname, errno);
 				return -1;
 			}
-			sscanf(msg, "%lu", &sizeBuf);
+			
+			sscanf(msgSize, "%lu", &sizeBuf);
+			readBytes = readBytes + sizeBuf;
 			if(sizeBuf != 0){
-				if((readCont = calloc(sizeBuf, sizeof(char))) == NULL){
+				if((readCont = malloc(sizeBuf*sizeof(char)+1)) == NULL){
+					PRINT(setPrint, "appendToFile %s %s: fail with error %d\n", pathname, dirname, errno);
+					return -1;
+				}
+				//file content
+				if (readn(csfd, (void*) readCont, sizeBuf) <= 0){
 					PRINT(setPrint, "appendToFile %s %s: fail with error %d\n", pathname, dirname, errno);
 					return -1;
 				}
 			
-			
 			}
-			else{
-				readCont = " ";
-			}
-			readBytes = readBytes + sizeBuf;
-			if(dirSet){
+			if(dirname != NULL){
+				char tmpPath[UNIX_PATH_MAX];
+				strcpy(tmpPath, dirname);
 				if((strlen(dirname)+(strlen(name)) > UNIX_PATH_MAX)){
 					errno = ENAMETOOLONG;
 					PRINT(setPrint, "appendToFile %s %s: fail with error %d\n", pathname, dirname, errno);
@@ -749,6 +726,10 @@ int appendToFile(const char* pathname, void* buf, size_t size, const char* dirna
 				char newPath[UNIX_PATH_MAX];
 				strcpy(newPath, tmpPath);
 				strncat(newPath, name, strlen(name)+1);
+				//create directories for saving files
+				mkdirs(newPath);
+
+		
 				FILE* savedFile;
 				if((savedFile = fopen(newPath, "w+")) == NULL){
 					PRINT(setPrint, "appendToFile %s %s: fail with error %d\n", pathname, dirname, errno);
@@ -758,23 +739,15 @@ int appendToFile(const char* pathname, void* buf, size_t size, const char* dirna
 					PRINT(setPrint, "appendToFile %s %s: fail with error %d\n", pathname, dirname, errno);
 					return -1;
 				}
-				writtenBytes = writtenBytes + sizeBuf;
 				if(fclose(savedFile) != 0){
 					PRINT(setPrint, "appendToFile %s %s: fail with error %d\n", pathname, dirname, errno);
 					return -1;
-				}		
+				}	
 			}
 			free(readCont);
 			readCont = NULL;
 			sizeBuf = 0;
 			j++;
-	
-	}
-	if(dirSet){
-		if(closedir(directory) != 0){
-			PRINT(setPrint, "appendToFile %s %s: fail with error %d\n", pathname, dirname, errno);
-			return -1;
-		}
 	
 	}
 	free(tmpBuf);
@@ -1000,7 +973,10 @@ int removeFile(const char* pathname){
 				PRINT(setPrint, "removeFile %s: fail with error %d\n", pathname, errno);
 				return -1;
 			}
+			printf("error = %d\n", error);
+			printf("error/256 = %d\n", error/256);
 			errno = error/256;
+			printf("errno = %d\n", errno);
 			PRINT(setPrint, "removeFile %s: fail with error %d\n", pathname, errno);
 			return -1;
 		case -2:

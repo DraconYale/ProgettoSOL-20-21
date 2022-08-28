@@ -1,9 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
+#include <sys/time.h>
 #include <math.h>
 #include <errno.h>
+#include <time.h>
 
 #include <icl_hash.h>
 #include <list.h>
@@ -124,12 +125,14 @@ storedFile* getVictim(storage* storage){
 		case 1:
 			victimElem = getHead(storage->filesFIFOQueue);
 			vName = victimElem->info;
-			victim = icl_hash_find(storage->files, (void*) victimElem->info);
+			victim = icl_hash_find(storage->files, (void*) vName);
 			tmpElem = nextList(storage->filesFIFOQueue, victimElem);
 			if(tmpElem != NULL){
+				
 				storedFile* tmpVict = icl_hash_find(storage->files, (void*) tmpElem->info);
-				double tmpTime = 0;
-				double maxDiffTime = fabs(difftime(victim->lastAccess, tmpVict->lastAccess));
+				long tmpTime = 0;
+				long maxDiffTime = fabs(difftime(victim->lastAccess, tmpVict->lastAccess));
+				
 				while(tmpElem != NULL){
 					tmpTime = difftime(victim->lastAccess, tmpVict->lastAccess);
 					if(fabs(tmpTime) > fabs(maxDiffTime)){
@@ -140,8 +143,13 @@ storedFile* getVictim(storage* storage){
 				
 					}
 					tmpElem = nextList(storage->filesFIFOQueue, tmpElem);
+					if(tmpElem != NULL){
+						tmpVict = icl_hash_find(storage->files, (void*) tmpElem->info);
+					}
+					
 				}
 			}
+			
 			copyV = malloc(sizeof(storedFile));
 			if((copyV->name = malloc(strlen(victim->name)*sizeof(char)+1)) == NULL){
 				return NULL;
@@ -152,14 +160,13 @@ storedFile* getVictim(storage* storage){
 				return NULL;
 			}
 			memcpy(copyV->content, victim->content, victim->size);
+			copyV->whoOpened = NULL;
+			copyV->mux = NULL;
 			storage->filesNumb--;
 			storage->sizeMB = storage->sizeMB - victim->size;
 			storage->victimNumb++;
-			free(victim->name);
-			free(victim->content);
-			freeList(victim->whoOpened, (void*)freeElem);
-			freeLock(victim->mux);
-			icl_hash_delete(storage->files, victim, free, (void*)freeFile);
+			removeList(storage->filesFIFOQueue, victim->name, (void*)freeElem);
+			icl_hash_delete(storage->files, victim->name, free, (void*)freeFile);
 			return copyV;
 	}
 	return NULL;
@@ -196,6 +203,7 @@ int storageOpenFile(storage* storage, char* filename, int flags, int client){
 		if(writeUnlock(storage->mux) != 0){
 			return -2;
 		}
+		free(tmpFilename);
 		errno = EEXIST;
 		return -1;
 	}
@@ -324,7 +332,6 @@ int storageReadFile(storage* storage, char* filename, void** sentCont, unsigned 
 		return -2;
 	}
 	snprintf(clientStr, length + 1, "%d", client);
-	printList(readF->whoOpened);
 	if((containsList(readF->whoOpened, clientStr)) == 0){
 		if(readUnlock(readF->mux) != 0){
 			return -2;
@@ -346,6 +353,7 @@ int storageReadFile(storage* storage, char* filename, void** sentCont, unsigned 
 			}
 			memcpy(*sentCont, readF->content, readF->size);
 			*sentSize = readF->size;
+			readF->lastAccess = time(NULL);
 			if(readUnlock(readF->mux) != 0){
 				return -2;
 			}
@@ -427,6 +435,7 @@ int storageReadNFiles(storage* storage, int N, list** sentFilesList, int client)
 				freeFile(file);
 				return -1;
 			}
+			kFile->lastAccess = time(NULL);
 			if(readUnlock(kFile->mux) != 0){
 				return -2;
 			}
@@ -537,6 +546,7 @@ int storageWriteFile(storage* storage, char* name, void* content, unsigned long 
 	strncpy(data, content, contentSize+1);
 	writeF->content = data;
 	writeF->size = contentSize;
+	writeF->lastAccess = time(NULL);
 	storage->filesNumb++;
 	storage->sizeMB = storage->sizeMB + contentSize;
 	appendList(storage->filesFIFOQueue, tmpName);
@@ -610,7 +620,7 @@ int storageAppendFile(storage* storage, char* name, void* content, unsigned long
 		}
 		memcpy(writeF->content + writeF->size, content, contentSize);
 		writeF->size = writeF->size + contentSize;
-			
+		writeF->lastAccess = time(NULL);	
 		storage->sizeMB = storage->sizeMB + contentSize;
 		updateStorage(storage);
 		if(writeUnlock(writeF->mux) != 0){
@@ -672,9 +682,10 @@ int storageLockFile(storage* storage, char* name, int client){
 		return -1;
 	
 	}
-	
+	free(clientStr);
 	if(lockF->lockerClient == -1 || lockF->lockerClient == client){
 		lockF->lockerClient = client;
+		lockF->lastAccess = time(NULL);
 		if(writeUnlock(lockF->mux) != 0){
 			return -2;
 		}
@@ -763,12 +774,10 @@ int storageCloseFile(storage* storage, char* filename, int client){
 		errno = ENOENT;					
 		return -1;
 	}
-	if(writeLock(closeF->mux) != 0){
+	if(readLock(closeF->mux) != 0){
 		return -2;
 	}
-	if(readUnlock(storage->mux) != 0){
-		return -2;
-	}
+	
 	
 	int length = snprintf(NULL, 0, "%d", client);
 	char* clientStr;
@@ -776,17 +785,31 @@ int storageCloseFile(storage* storage, char* filename, int client){
 		return -2;
 	}
 	snprintf(clientStr, length + 1, "%d", client);
+	
 	if(!containsList(closeF->whoOpened, clientStr)){
-		if(writeUnlock(closeF->mux) != 0){
+		if(readUnlock(closeF->mux) != 0){
+			return -2;
+		}
+		if(readUnlock(storage->mux) != 0){
 			return -2;
 		}
 		errno = EACCES;
 		return -1;
 	
+	}else{
+		if(readUnlock(closeF->mux) != 0){
+			return -2;
+		}
+		if(writeLock(closeF->mux) != 0){
+			return -2;
+		}
+		removeList(closeF->whoOpened, clientStr, (void*)freeElem);
+		if(writeUnlock(closeF->mux) != 0){
+			return -2;
+		}
 	}
-	removeList(closeF->whoOpened, clientStr, (void*)freeElem);
 	free(clientStr);
-	if(writeUnlock(closeF->mux) != 0){
+	if(readUnlock(storage->mux) != 0){
 		return -2;
 	}
 	return 0;
@@ -837,7 +860,6 @@ int storageRemoveFile(storage* storage, char* name, int client){
 		storage->sizeMB = storage->sizeMB - removeF->size;
 		removeList(storage->filesFIFOQueue, removeF->name, (void*)freeElem);
 		icl_hash_delete(storage->files, removeF->name, free, (void*)freeFile);
-		icl_hash_dump(stdout, storage->files);
 		if(writeUnlock(storage->mux) != 0){
 			return -2;
 		}

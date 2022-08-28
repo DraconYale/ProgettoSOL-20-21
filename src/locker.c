@@ -77,7 +77,7 @@ int readUnlock(locker* lock){
 	}
 	lock->readersNumber--;					//a reader left the reader's group
 	if(lock->readersNumber == 0){
-		pthread_cond_signal(&(lock->cond));
+		pthread_cond_broadcast(&(lock->cond));
 	}					
 	if((err = pthread_mutex_unlock(&(lock->mux))) != 0){
 		errno = err;

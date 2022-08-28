@@ -89,7 +89,6 @@ char* dequeueBuffer(boundedBuffer* buf){
 		return NULL;
 	}
 	int err;
-	
 	//critical section
 	if((err = (pthread_mutex_lock(&(buf->mutex)))) != 0){
 		perror("Couldn't lock");

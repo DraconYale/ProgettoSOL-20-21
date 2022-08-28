@@ -117,15 +117,12 @@ int writeRecDir(char* dirname, char* dirMiss) {
 				}
 				else{
 					if (openFile(file, O_LOCK | O_CREATE) != 0){
-						perror("-w openFile");
 						return -1;
 					}
 					if(writeFile(file, dirMiss) != 0){
-						perror("-w writeFile");
 						return -1;
 					}
 					if(closeFile(file) != 0){
-						perror("-w closeFile");
 						return -1;
 					}
 					nWrite--;
@@ -148,6 +145,7 @@ int main(int argc, char** argv){
 		return 1;
 	
 	}
+	char* socket = NULL;
 	struct timespec absTime;
 	absTime.tv_nsec = 0;
 	absTime.tv_sec = 10;
@@ -220,7 +218,6 @@ int main(int argc, char** argv){
 	if(!setDirRead){
 		dirRead = NULL;
 	}
-	char* socket = NULL;
 	int opt;
 	int err;
 	while((opt = getopt(argc, argv, "hf:w:W:D:r:R::d:t:l:u:c:p")) != -1){
@@ -232,7 +229,6 @@ int main(int argc, char** argv){
 		    	if(!connected){
 			    	socket = optarg;
 			       	if(openConnection(socket, timeC, absTime) != 0){
-			       		perror("-f");
 			       		return -1;
 			       	}
 			       	connected = 1;
@@ -289,7 +285,7 @@ int main(int argc, char** argv){
 		    			nWrite = -1;
 		    		}
 		    		if(writeRecDir(dir, dirWrite) != 0){
-		    			return -1;
+		    			break;
 		    		}
 		    		sleep(timeC);
 		    		break;
@@ -306,35 +302,16 @@ int main(int argc, char** argv){
 		    case 'W' :
 		    	if(connected){
 		    		//tokenize optarg
-		    		char** files = calloc(MAXLEN, sizeof(char*));
-		 		int filesNumber = 0;
 		    		char* strtokState = NULL;
 		    		char* token = strtok_r(optarg, ",", &strtokState);
-		    		if(token == NULL){
-		    			errno = EINVAL;
-		    			perror("-W filename");
-		    			break;
-		    		
-		    		}
 		    		while(token != NULL){
-		    			files[filesNumber] = token;
-		    			filesNumber++;
+		    			if((err = openFile(token, O_LOCK | O_CREATE)) != 0){
+		    				break;
+		    			}
+		    			writeFile(token,dirWrite);
+		    			closeFile(token);
 		    			token = strtok_r(NULL, ",", &strtokState);
 		    		}
-		    		int w = 0;						//index used for pointing the files
-		    		while(w<filesNumber){
-		    			if((err = openFile(files[w], O_LOCK | O_CREATE)) != 0){
-		    				perror("-W opening file");
-		    			}
-		    			if((err = writeFile(files[w],dirWrite)) != 0){
-		    					perror("-W write");
-		    			}
-		    			if((err = (closeFile(files[w]))) != 0){
-						perror("-W closeFile");
-					}
-		    			w++;
-		    		}
-		    		free(files);
 		    		sleep(timeC);
 		    		break;
 		    		
@@ -354,43 +331,33 @@ int main(int argc, char** argv){
 		    		//tokenize optarg
 		    		char* strtokState = NULL;
 		    		char* token = strtok_r(optarg, ",", &strtokState);
-		    		/*while(token != NULL){
-		    			strncpy(files[filesNumber], token, strlen(token));
-		    			filesNumber++;
-		    			token = strtok_r(NULL, ",", &strtokState);
-		    		}
-		    		*/						
+				
 		    		while(token != NULL){
-		    			printf("leggo il file %s\n", token);
 		    			if((err = openFile(token, 0)) != 0){
-		    				perror("-r opening file");
+		    				break;
 		    			}
 		    			char* ansBuf = NULL;
 		    			size_t readSize = 0;
-		    			if((err = readFile(token, (void**) &ansBuf,&readSize)) != 0){
-		    					perror("-r read file");
-		    					break;
-		    			}
+		    			if((err = readFile(token, (void**) &ansBuf,&readSize)) != 0)
 		    			if(dirRead != NULL){
 		    				char file[UNIX_PATH_MAX];
-						strncpy(file,dirRead,UNIX_PATH_MAX-1);
-						strncat(file,token, UNIX_PATH_MAX-1);
+						strcpy(file,dirRead);
+						strncat(file,token, strlen(token)+1);
+						
+						//create directories for saving files
+						mkdirs(file);
 						FILE* dest;
 						if((dest = fopen(file, "w")) == NULL){
 							perror("-r opening dest file");
-							//free(files);
 							break;
 						}
 						if(fwrite(ansBuf, readSize, 1, dest) != 1){
 							perror("-r writing in dest file");
-							//free(files);
 							break;
 						}
 						fclose(dest);
 		    			}
-		    			if(closeFile(token) != 0){
-						perror("-r closeFile");
-					}
+		    			closeFile(token);
 					token = strtok_r(NULL, ",", &strtokState);
 		    		}
 		    		//free(files);
@@ -460,30 +427,18 @@ int main(int argc, char** argv){
 		    case 'l' :
 		    	if(connected){
 		    		//tokenize optarg
-		    		char** files = calloc(MAXLEN, sizeof(char*));
-		 		int filesNumber = 0;
 		    		char* strtokState = NULL;
 		    		char* token = strtok_r(optarg, ",", &strtokState);
+		 
 		    		while(token != NULL){
-		    			files[filesNumber] = token;
-		    			filesNumber++;
-		    			token = strtok_r(NULL, ",", &strtokState);
-		    		}
-		    		int l = 0;						//index used for pointing the files
-		    		while(l<filesNumber){
-		    			if((err = openFile((files[l]), 0) != 0)){
-		    				perror("-l opening file");
+		    			if((err = openFile((token), 0) != 0)){
 		    				break;
 		    			}
-		    			if((err = lockFile(files[l])) != 0){
-		    					perror("-l lock");
-		    			}
-		    			if((err = closeFile(files[l])) != 0){
-						perror("-l closeFile");
-					}
-		    			l++;
+		    			lockFile(token);
+		    			closeFile(token);
+		    			token = strtok_r(NULL, ",", &strtokState);
 		    		}
-		    		free(files);
+		    		//free(files);
 		    		sleep(timeC);
 		    		break;
 		    		
@@ -498,30 +453,18 @@ int main(int argc, char** argv){
 		    case 'u' :
 		    	if(connected){
 		    		//tokenize optarg
-		    		char** files = calloc(MAXLEN, sizeof(char*));
-		 		int filesNumber = 0;
 		    		char* strtokState = NULL;
 		    		char* token = strtok_r(optarg, ",", &strtokState);
+		  
 		    		while(token != NULL){
-		    			files[filesNumber] = token;
-		    			filesNumber++;
-		    			token = strtok_r(NULL, ",", &strtokState);
-		    		}
-		    		int u = 0;						//index used for pointing the files
-		    		while(u<filesNumber){
-		    			if((err = openFile((files[u]), 0) != 0)){
-		    				perror("-u opening file");
+		    			if((err = openFile((token), 0) != 0)){
 		    				break;
 		    			}
-		    			if((err = unlockFile(files[u])) != 0){
-		    					perror("-u unlock");
-		    			}
-		    			if((err = closeFile(files[u])) != 0){
-						perror("-u closeFile");
-					}
-		    			u++;
+		    			unlockFile(token);
+		    			closeFile(token);
+		    			token = strtok_r(NULL, ",", &strtokState);
 		    		}
-		    		free(files);
+		    		//free(files);
 		    		sleep(timeC);
 		    		break;
 		    	
@@ -535,27 +478,18 @@ int main(int argc, char** argv){
 		    case 'c' :
 		    	if(connected){
 		    		//tokenize optarg
-		    		char** files = calloc(MAXLEN, sizeof(char*));
-		 		int filesNumber = 0;
 		    		char* strtokState = NULL;
 		    		char* token = strtok_r(optarg, ",", &strtokState);
+		    								//index used for pointing the files
 		    		while(token != NULL){
-		    			files[filesNumber] = token;
-		    			filesNumber++;
-		    			token = strtok_r(NULL, ",", &strtokState);
-		    		}
-		    		int c = 0;						//index used for pointing the files
-		    		while(c<filesNumber){
-		    			printf("f");
-		    			if((err = openFile((files[c]), O_LOCK) != 0)){
-		    				perror("-c opening file");
+		    			if((err = openFile((token), O_LOCK) != 0)){
+		    				break;
 		    			}
-		    			if((err = removeFile(files[c])) != 0){
+		    			if((err = removeFile(token)) != 0){
 		    					perror("-c remove");
 		    			}
-		    			c++;
+		    			token = strtok_r(NULL, ",", &strtokState);
 		    		}
-		    		free(files);
 		    		sleep(timeC);
 		    		break;
 		   

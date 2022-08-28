@@ -3,6 +3,7 @@
 
 #include <unistd.h>
 #include <stdio.h>
+#include <sys/stat.h>
 
 #define O_CREATE 1
 #define O_LOCK 2
@@ -53,6 +54,41 @@ writen(int fd, void *ptr, size_t n) {
      ptr   += nwritten;
    }
    return(n - nleft); /* return >= 0 */
+}
+
+static inline int mkdirs(char* path){
+	
+	char* pointer;
+	char* addPath = malloc(strlen(path)*sizeof(char)+1);
+	strcpy(addPath, path);
+	pointer = strrchr(addPath, '/');
+	if(pointer != NULL){
+		*pointer = '\0';
+	}
+	char* p;
+	for(p = addPath+1; *p; p++){
+		if(*p == '/'){
+					
+			*p = '\0';
+			if(mkdir(addPath, S_IRWXU) != 0){
+				if(errno != EEXIST){
+					return -1;
+				}
+			}
+			*p = '/';
+		}
+					
+				
+	}
+	if(mkdir(addPath, S_IRWXU) != 0){
+		if(errno != EEXIST){
+			return -1;
+		}
+	}
+	free(addPath);
+	return 0;
+
+
 }
 
 #endif

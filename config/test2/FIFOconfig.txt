@@ -1,0 +1,19 @@
+//Server configuration file
+
+//Number of worker threads
+Worker Number = 4
+
+//Storage Size (in Bytes)
+Storage Size = 1000000
+
+//Max number of file that can be stored
+Storage File Number = 10
+
+//Path to socket used by server
+Path To Socket = bin/socket.sk
+
+//0 for FIFO policy, 1 for LRU policy
+Replacement policy = 0
+
+//Path to log (used for generating different logs)
+Path to log file = log/test2/FIFO.txt

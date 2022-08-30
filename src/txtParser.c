@@ -13,6 +13,7 @@
 #define REPOLICY "Replacement policy = "
 #define LOGFILE "Path to log file = "
 
+//other macros
 #define MAX_SOCKET_LENGHT 256
 #define BUFFERSIZE 1024
 
@@ -45,7 +46,7 @@ int applyConfig(txtFile* conf, const char* pathToConfig){
 		return -1;
 	}
 	FILE* config;
-	if((config = fopen(pathToConfig, "r")) == NULL){						//fopen sets errno when fails
+	if((config = fopen(pathToConfig, "r")) == NULL){				//fopen sets errno when fails
 		return -1;
 	}
 	char buf[BUFFERSIZE];
@@ -57,13 +58,13 @@ int applyConfig(txtFile* conf, const char* pathToConfig){
 		fgets(buf, BUFFERSIZE, config);			
 		//parser needs to search for every defined config in configuration file
 		if(strncmp(buf, WORKERS, strlen(WORKERS)) == 0){
-			value = strtol(buf + strlen(WORKERS), NULL, 10); 				//strtol of value, base 10
+			value = strtol(buf + strlen(WORKERS), NULL, 10); 		//strtol of value, base 10
 			//strtol may set errno for underflow or overflow!
 			if(errno == ERANGE){
 				if(fclose(config) != 0){				//fclose sets errno
 					return -1;
 				}
-				errno = EINVAL;								//invalid value, sets errno = EINVAL
+				errno = EINVAL;						//invalid value, sets errno = EINVAL
 				return -1;
 			}
 			else{
@@ -79,7 +80,7 @@ int applyConfig(txtFile* conf, const char* pathToConfig){
 				if(fclose(config) != 0){				//fclose sets errno
 					return -1;
 				}
-				errno = EINVAL;								//invalid value, sets errno = EINVAL
+				errno = EINVAL;						//invalid value, sets errno = EINVAL
 				return -1;
 			}
 			else{
@@ -89,13 +90,13 @@ int applyConfig(txtFile* conf, const char* pathToConfig){
 			}
 		}
 		if(strncmp(buf, STORAGEF, strlen(STORAGEF)) == 0){
-			value = strtol(buf + strlen(STORAGEF), NULL, 10); 				//strtol of value, base 10
+			value = strtol(buf + strlen(STORAGEF), NULL, 10); 		//strtol of value, base 10
 			//strtol may set errno for underflow or overflow!
 			if(errno == ERANGE){
 				if(fclose(config) != 0){				//fclose sets errno
 					return -1;
 				}
-				errno = EINVAL;								//invalid value, sets errno = EINVAL
+				errno = EINVAL;						//invalid value, sets errno = EINVAL
 				return -1;
 			}
 			else{
@@ -111,13 +112,13 @@ int applyConfig(txtFile* conf, const char* pathToConfig){
 			continue;
 		}
 		if(strncmp(buf, REPOLICY, strlen(REPOLICY)) == 0){
-			value = strtol(buf + strlen(REPOLICY), NULL, 10); 				//strtol of value, base 10
+			value = strtol(buf + strlen(REPOLICY), NULL, 10); 		//strtol of value, base 10
 			//strtol may set errno for underflow or overflow!
 			if(errno == ERANGE){
 				if(fclose(config) != 0){				//fclose sets errno
 					return -1;
 				}
-				errno = EINVAL;								//invalid value, sets errno = EINVAL
+				errno = EINVAL;						//invalid value, sets errno = EINVAL
 				return -1;
 			}
 			else{
@@ -134,10 +135,9 @@ int applyConfig(txtFile* conf, const char* pathToConfig){
 			continue;
 		}
 	}
-	if(fclose(config) != 0){									//fclose sets errno
+	if(fclose(config) != 0){							//fclose sets errno
 		return -1;
 	}
 	return 0;
-	
 
 }

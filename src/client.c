@@ -68,7 +68,6 @@ int connected = 0;
 char* filename = NULL;
 
 
-
 //function used to visit recursively directories and send to server the files stored in them
 int writeRecDir(char* dirname, char* dirMiss) {
 	if(dirname == NULL){
@@ -318,7 +317,7 @@ int main(int argc, char** argv){
 		    	
 		    	}
 		    	else{
-		    		errno = ENOTCONN; 	//ENOTCONN 107 Il socket di destinazione non è connesso (from "errno -l")
+		    		errno = ENOTCONN; 	
 				perror("-W");
 		    		break;
 		    	}
@@ -342,6 +341,7 @@ int main(int argc, char** argv){
 		    				break;
 		    			}
 		    			if(dirRead != NULL){
+		    				//append file name to dirRead
 		    				char file[UNIX_PATH_MAX];
 						strcpy(file,dirRead);
 						strncat(file,token, strlen(token)+1);
@@ -361,14 +361,13 @@ int main(int argc, char** argv){
 		    			closeFile(token);
 					token = strtok_r(NULL, ",", &strtokState);
 		    		}
-		    		//free(files);
 		    		sleep(timeC);
 		    		break;
 		    		
 		    	
 		    	}
 		    	else{
-		    		errno = ENOTCONN; 	//ENOTCONN 107 Il socket di destinazione non è connesso (from "errno -l")
+		    		errno = ENOTCONN; 	
 				perror("-r");
 		    		break;
 		    	}
@@ -410,7 +409,7 @@ int main(int argc, char** argv){
 		    		
 		    	}
 		    	else{
-		    		errno = ENOTCONN; 	//ENOTCONN 107 Il socket di destinazione non è connesso (from "errno -l")
+		    		errno = ENOTCONN; 	
 				perror("-R");
 		    		break;
 		    	}
@@ -441,7 +440,7 @@ int main(int argc, char** argv){
 		    	
 		    	}
 		    	else{
-		    		errno = ENOTCONN; 	//ENOTCONN 107 Il socket di destinazione non è connesso (from "errno -l")
+		    		errno = ENOTCONN; 	
 				perror("-l");
 		    		break;
 		    	}
@@ -465,7 +464,7 @@ int main(int argc, char** argv){
 		    	
 		    	}
 		    	else{
-		    		errno = ENOTCONN; 	//ENOTCONN 107 Il socket di destinazione non è connesso (from "errno -l")
+		    		errno = ENOTCONN; 	
 				perror("-u");
 		    		break;
 		    	}
@@ -475,7 +474,6 @@ int main(int argc, char** argv){
 		    		//tokenize optarg
 		    		char* strtokState = NULL;
 		    		char* token = strtok_r(optarg, ",", &strtokState);
-		    								//index used for pointing the files
 		    		while(token != NULL){
 		    			if((err = openFile((token), O_LOCK) != 0)){
 		    				break;
@@ -490,7 +488,7 @@ int main(int argc, char** argv){
 		   
 		    	}
 		    	else{
-		    		errno = ENOTCONN; 	//ENOTCONN 107 Il socket di destinazione non è connesso (from "errno -l")
+		    		errno = ENOTCONN; 	
 				perror("-c");
 		    		break;
 		    	}
@@ -500,6 +498,7 @@ int main(int argc, char** argv){
         	}
         	
 	}
+	//close connection and clean
 	free(dirWrite);
 	free(dirRead);
 	if(closeConnection(socket) != 0){

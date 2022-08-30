@@ -102,7 +102,7 @@ int writeLock(locker* lock){
 		pthread_cond_wait(&(lock->cond), &(lock->mux));
 	}					
 	lock->writerPresence = true;
-	while(lock->readersNumber != 0){			//writer waits for readers to finish
+	while(lock->readersNumber != 0){				//writer waits for readers to finish
 		pthread_cond_wait(&(lock->cond), &(lock->mux));
 	}	
 				
@@ -125,8 +125,8 @@ int writeUnlock(locker* lock){
 		errno = err;
 		return -1;
 	}				
-	lock->writerPresence = false;
-	pthread_cond_broadcast(&(lock->cond));			
+	lock->writerPresence = false;					//writer left
+	pthread_cond_broadcast(&(lock->cond));				//wakes up who want to read/write
 	if((err = pthread_mutex_unlock(&(lock->mux))) != 0){
 		errno = err;
 		return -1;

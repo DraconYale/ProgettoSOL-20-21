@@ -1,5 +1,5 @@
 /*
-Bounded buffer used to create the job queue. It's implemented as a circular queue (this may change)
+Bounded buffer used to create the job queue. It's implemented as a circular queue.
 */
 #include <stdlib.h>
 #include <stdio.h>
@@ -73,6 +73,7 @@ int enqueueBuffer(boundedBuffer* buf, char* job){
 	(buf->commands[buf->head]) = newJob;
 	buf->head = (buf->head + 1) % buf->size;
 	buf->jobNumber = buf->jobNumber + 1;
+	//wakes up readers if there is a job
 	if(buf->jobNumber > 0){
 		pthread_cond_broadcast(&(buf->empty));
 	}
@@ -102,6 +103,7 @@ char* dequeueBuffer(boundedBuffer* buf){
 	free(buf->commands[buf->tail]);
 	buf->tail = (buf->tail + 1) % buf->size;
 	buf->jobNumber = buf->jobNumber - 1;
+	//wakes up writers when the job queue is empty
 	if(buf->jobNumber == 0){
 		pthread_cond_broadcast(&(buf->full));
 	}

@@ -43,6 +43,10 @@ void freeFile(storedFile* file){
 	}	
 }
 
+/*
+storageInit: creates a new storage
+	     returns the new storage if success, NULL if failure and sets errno.
+*/
 storage* storageInit(int maxFiles, unsigned long maxMB, int repPolicy){
 
 	if(maxFiles <= 0 || maxMB <= 0){
@@ -87,7 +91,10 @@ storage* storageInit(int maxFiles, unsigned long maxMB, int repPolicy){
 	return newStorage;
 }
 
-
+/*
+getVictim: chooses a victim from storage
+	   returns a copy of the chosen victim, NULL if failure and sets errno.
+*/
 storedFile* getVictim(storage* storage){
 	elem* victimElem = NULL;
 	char* vName = NULL;
@@ -127,6 +134,8 @@ storedFile* getVictim(storage* storage){
 			vName = victimElem->info;
 			victim = icl_hash_find(storage->files, (void*) vName);
 			tmpElem = nextList(storage->filesFIFOQueue, victimElem);
+			//choose the victim that has the max difftime in absolute value
+			//in case of same difftime the first victim chosen is deleted (FIFO like)
 			if(tmpElem != NULL){
 				
 				storedFile* tmpVict = icl_hash_find(storage->files, (void*) tmpElem->info);
@@ -172,6 +181,7 @@ storedFile* getVictim(storage* storage){
 	return NULL;
 }
 
+//function used to mantain storage infos
 int updateStorage(storage* storage){
 	if(storage->filesNumb > storage->maxFileStored){
 		storage->maxFileStored = storage->filesNumb;
@@ -182,7 +192,12 @@ int updateStorage(storage* storage){
 	return 0;
 }
 
-
+/*
+storageOpenFile: opens a file in storage. 
+		 If flag set is O_CREATE and the file doesn't exist, it creates a new empty file and opens it.
+                 If flag set is O_LOCK, client becomes file's clientLocker if the file wasn't locked.
+                 returns (0) if success, (-1) if failure, (-2) if fatal error. Sets errno.
+*/
 int storageOpenFile(storage* storage, char* filename, int flags, int client){
 	
 	if(storage == NULL || filename == NULL){
@@ -199,6 +214,7 @@ int storageOpenFile(storage* storage, char* filename, int flags, int client){
 	if((icl_hash_find(storage->files, (void*) tmpFilename) != NULL)){
 		found = 1;
 	}
+	//if open is called with O_CREATE flag but file already exists, it fails
 	if(flags & O_CREATE && found == 1){
 		if(writeUnlock(storage->mux) != 0){
 			return -2;
@@ -207,8 +223,9 @@ int storageOpenFile(storage* storage, char* filename, int flags, int client){
 		errno = EEXIST;
 		return -1;
 	}
+	//if open is called with O_CREATE flag and file doesn't exists, the file is created and opened 
 	if(flags & O_CREATE && found == 0){
-		//enters as a writer
+	
 		storedFile* newFile;
 		if((newFile = malloc(sizeof(storedFile))) == NULL){
 			return -2;
@@ -248,7 +265,7 @@ int storageOpenFile(storage* storage, char* filename, int flags, int client){
 		if(writeUnlock(storage->mux) != 0){
 			return -2;
 		}
-		//enters as a reader
+		//enters as a reader, to check if file exists
 		if(readLock(storage->mux) != 0){
 			return -2;
 		}
@@ -303,6 +320,10 @@ int storageOpenFile(storage* storage, char* filename, int flags, int client){
 	return 0;
 }
 
+/*
+storageReadFile: reads filename from storage
+		 returns (0) if success, (-1) if failure, (-2) if fatal error. Sets errno.
+*/
 int storageReadFile(storage* storage, char* filename, void** sentCont, unsigned long* sentSize, int client){
 	
 	if(storage == NULL || filename == NULL){
@@ -326,12 +347,14 @@ int storageReadFile(storage* storage, char* filename, void** sentCont, unsigned 
 	if(readUnlock(storage->mux) != 0){
 		return -2;
 	}
+	//snprintf(NULL, 0,...) returns the length of the argument 
 	int length = snprintf(NULL, 0, "%d", client);
 	char* clientStr;
 	if((clientStr = malloc(length + 1)) == NULL){
 		return -2;
 	}
 	snprintf(clientStr, length + 1, "%d", client);
+	//check if client opened the file
 	if((containsList(readF->whoOpened, clientStr)) == 0){
 		if(readUnlock(readF->mux) != 0){
 			return -2;
@@ -353,6 +376,7 @@ int storageReadFile(storage* storage, char* filename, void** sentCont, unsigned 
 			}
 			memcpy(*sentCont, readF->content, readF->size);
 			*sentSize = readF->size;
+			//update last access to file
 			readF->lastAccess = time(NULL);
 			if(readUnlock(readF->mux) != 0){
 				return -2;
@@ -373,6 +397,10 @@ int storageReadFile(storage* storage, char* filename, void** sentCont, unsigned 
 	
 }
 
+/*
+storageReadNFiles: reads N files from storage
+		   returns (0) if success, (-1) if failure, (-2) if fatal error. Sets errno.
+*/
 int storageReadNFiles(storage* storage, int N, list** sentFilesList, int client){
 	if(storage == NULL){
 		errno = EINVAL;
@@ -438,6 +466,7 @@ int storageReadNFiles(storage* storage, int N, list** sentFilesList, int client)
 				return -1;
 			}
 			freeFile(file);
+			//update last access to file
 			kFile->lastAccess = time(NULL);
 			if(readUnlock(kFile->mux) != 0){
 				return -2;
@@ -461,7 +490,10 @@ int storageReadNFiles(storage* storage, int N, list** sentFilesList, int client)
 	return 0;
 }
 
-//storageWriteFile fails if the file is not "new" or locked by client (file needs to be opened wit O_CREATE and O_LOCK)
+/*
+storageWriteFile: writes a new file in storage (if it was created with flags O_CREATE and O_LOCK)
+ 		   returns (0) if success, (-1) if failure, (-2) if fatal error. Sets errno.
+*/
 int storageWriteFile(storage* storage, char* name, void* content, unsigned long contentSize, list** victims, int client){
 	
 	if(storage == NULL || name == NULL || content == NULL || contentSize <= 0 || victims == NULL){
@@ -525,10 +557,11 @@ int storageWriteFile(storage* storage, char* name, void* content, unsigned long 
 		errno = EACCES;
 		return -1;	
 	}
+	//check if there is enough space. If not, while iterates untile there is space for the new file
 	if((storage->filesNumb + 1) > storage->maxFiles || (storage->sizeMB + contentSize) > storage->maxMB){
+		//create victims list
 		list* tmpVictims = initList();
 	
-	//check if there is enough space
 		while((storage->filesNumb + 1) > storage->maxFiles || (storage->sizeMB + contentSize) > storage->maxMB){
 				storedFile* victim; 
 				if((victim = getVictim(storage)) == NULL){
@@ -564,6 +597,9 @@ int storageWriteFile(storage* storage, char* name, void* content, unsigned long 
 
 }
 
+/*storageAppendFile: appends content to file
+ 		     returns (0) if success, (-1) if failure, (-2) if fatal error. Sets errno.
+*/
 int storageAppendFile(storage* storage, char* name, void* content, unsigned long contentSize, list** victims, int client){
 	
 	if(storage == NULL || name == NULL || content == NULL || contentSize <= 0 || victims == NULL){
@@ -606,14 +642,20 @@ int storageAppendFile(storage* storage, char* name, void* content, unsigned long
 	
 	if(writeF->lockerClient == -1 || writeF->lockerClient == client){	
 		//check if there is enough space
-		while(storage->filesNumb + 1 > storage->maxFiles || storage->sizeMB + contentSize > storage->maxMB){
-				storedFile* victim; 
-				if((victim = getVictim(storage)) == NULL){
-					return -2;
-				}
-				appendListCont(*victims, victim->name, strlen(victim->name), victim->content, victim->size);
+		if((storage->filesNumb + 1) > storage->maxFiles || (storage->sizeMB + contentSize) > storage->maxMB){
+			//create victims list
+			list* tmpVictims = initList();
+			
+			while(storage->filesNumb + 1 > storage->maxFiles || storage->sizeMB + contentSize > storage->maxMB){
+					storedFile* victim; 
+					if((victim = getVictim(storage)) == NULL){
+						return -2;
+					}
+					appendListCont(*victims, victim->name, strlen(victim->name), victim->content, victim->size);
+			}
+			*victims = tmpVictims;
+			
 		}
-		
 		if((writeF->content = realloc(writeF->content, writeF->size + contentSize)) == NULL){
 			return -2;
 		}
@@ -643,6 +685,10 @@ int storageAppendFile(storage* storage, char* name, void* content, unsigned long
 	}
 }
 
+/*
+storageLockFile: locks file in storage (if there isn't another clientLocker)
+		 returns (0) if success, (-1) if failure, (-2) if fatal error. Sets errno.
+*/
 int storageLockFile(storage* storage, char* name, int client){
 	
 	if(storage == NULL || name == NULL){
@@ -682,6 +728,7 @@ int storageLockFile(storage* storage, char* name, int client){
 	
 	}
 	free(clientStr);
+	//if client is not client locker and lock is free, locks the file
 	if(lockF->lockerClient == -1 || lockF->lockerClient == client){
 		lockF->lockerClient = client;
 		lockF->lastAccess = time(NULL);
@@ -694,11 +741,15 @@ int storageLockFile(storage* storage, char* name, int client){
 		if(writeUnlock(lockF->mux) != 0){
 			return -2;
 		}
-		errno = EACCES;
+		errno = EPERM;
 		return -1;
 	}
 }
 
+/*
+storageUnlockFile: unlocks file in storage
+		   returns (0) if success, (-1) if failure, (-2) if fatal error. Sets errno.
+*/
 int storageUnlockFile(storage* storage, char* name, int client){
 	
 	if(storage == NULL || name == NULL){
@@ -739,6 +790,7 @@ int storageUnlockFile(storage* storage, char* name, int client){
 	}
 	free(clientStr);
 	
+	//if client is lockerClient unlocks the file
 	if(unlockF->lockerClient == -1 || unlockF->lockerClient == client){
 		unlockF->lockerClient = -1;
 		if(writeUnlock(unlockF->mux) != 0){
@@ -755,6 +807,10 @@ int storageUnlockFile(storage* storage, char* name, int client){
 	}
 }
 
+/*
+storageCloseFile: closes file in storage (if client opened it)
+		  returns (0) if success, (-1) if failure, (-2) if fatal error. Sets errno.
+*/
 int storageCloseFile(storage* storage, char* filename, int client){
 	
 	if(storage == NULL || filename == NULL){
@@ -785,6 +841,7 @@ int storageCloseFile(storage* storage, char* filename, int client){
 	}
 	snprintf(clientStr, length + 1, "%d", client);
 	
+	//check if client opened the file
 	if(!containsList(closeF->whoOpened, clientStr)){
 		if(readUnlock(closeF->mux) != 0){
 			return -2;
@@ -815,6 +872,10 @@ int storageCloseFile(storage* storage, char* filename, int client){
 	
 }
 
+/*
+storageRemoveFile: removes file in storage (if client locked it before)
+		  returns (0) if success, (-1) if failure, (-2) if fatal error. Sets errno.
+*/
 int storageRemoveFile(storage* storage, char* name, int client){
 	
 	if(storage == NULL || name == NULL){

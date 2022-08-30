@@ -26,6 +26,7 @@
 #define UNIX_PATH_MAX 108
 #define COMMLENGTH 1024
 
+//log file mutex init and macro
 pthread_mutex_t mutexLog = PTHREAD_MUTEX_INITIALIZER;
 
 #define LOG(...){ \
@@ -40,6 +41,7 @@ pthread_mutex_t mutexLog = PTHREAD_MUTEX_INITIALIZER;
 	} \
 }
 
+//arguments to be passed to threads
 typedef struct workArg{
 	time_t initTime;
 	storage* storage;
@@ -70,15 +72,15 @@ static void* signalHandling(void* set);
 
 static void* workFunc(void* args);
 
-
-
 int main (int argc, char** argv){
 
 	if(argc != 2){
 		printf("Usage: ./server '/path/to/config'\n");
 		return 0;
 	}
+	//register cleanup function 
 	atexit(cleanup);
+	
 	time_t initTime = time(NULL);
 	time_t currTime = time(NULL);
 	double nowS = 0;
@@ -168,13 +170,13 @@ int main (int argc, char** argv){
 		exit(EXIT_FAILURE);
 	}
 	
-	
+	//open log file
 	if((logFile = fopen(config->logPath, "w")) == NULL){
 		perror("fopen");
 		exit(EXIT_FAILURE);
 	}
 	
-	//starting threads (to be fully implemented) 
+	//starting threads 
 	workArgs = malloc(sizeof(workArg));
 	workArgs->initTime = initTime;
 	workArgs->storage = storageS;
@@ -316,6 +318,7 @@ int main (int argc, char** argv){
 		
 }
 
+//cleanup function called when exiting
 static void cleanup(void){
 	int i = 0;	
 	snprintf(commandS, COMMLENGTH, "%d", -1);
@@ -330,6 +333,7 @@ static void cleanup(void){
 	}
 	pthread_join(sigHandler, NULL);
 	updateStorage(storageS);
+	//print Storage infos
 	printf("\n==STORAGE INFO==\n\n");
 	printf("Max number of files stored: %d\n", storageS->maxFileStored);
 	printf("Max megabytes stored: %5f MB\n", (float) (storageS->maxMBStored)/1000000);
@@ -337,6 +341,7 @@ static void cleanup(void){
 	printf("Currently stored files:\n");
 	printList(storageS->filesFIFOQueue);
 	printf("\n");
+	//write part of infos in log file
 	LOG("Max megabytes stored: %5f MB\n", (float) (storageS->maxMBStored)/1000000);
 	LOG("Max number of files stored: %d\n", storageS->maxFileStored);
 	LOG("Replacement algorithm sent %d victims\n", storageS->victimNumb);
@@ -354,9 +359,9 @@ static void cleanup(void){
 	close(fd_skt);
 	LOG("Server terminated successfully\n");
 	fclose(logFile);
-
 }
 
+//signal handler function
 static void* signalHandling(void* set){
 
 	sigset_t* copySet = (sigset_t*) set;
@@ -384,38 +389,39 @@ static void* signalHandling(void* set){
 
 static void* workFunc(void* args){
 	
-	int err;
+	int err;						//used in switch statements for return codes
+	//arguments passed to worker
 	workArg* arguments = (workArg*) args;
 	time_t initTime = arguments->initTime;
 	storage* storage = arguments->storage;
 	boundedBuffer* commands = arguments->commands;
 	int pOut = arguments->pipeOut;
 	FILE* logFile = arguments->log;
-	char pipeBuff[BUFFERSIZE];
-	operation op;
-	char* fdString;
-	int fd_client;
-	char returnStr[BUFFERSIZE];
-	char* command = malloc(COMMLENGTH*sizeof(char));
-	char* tokComm;
-	char* token;
-	char* pathname = malloc(COMMLENGTH*sizeof(char));
-	int flags;
-	void* sentBuf;
-	unsigned long sentSize; 
-	unsigned long readSize;
-	list* listOfFiles = NULL;
-	elem* current;
-	int N;
-	unsigned long writeSize;
-	time_t currTime = time(NULL);
-	double now = 0;
-	char* writeFileContent = NULL;
-	char sizeStr[BUFFERSIZE];
-	char* strtokState = NULL;
-	int errCopy;
+	char pipeBuff[BUFFERSIZE];				//used to send messages in pipe
+	operation op;						//used in switch statement to choose the right operation
+	char* fdString;						//fd_client as a string (used for dequeueBuffer)
+	int fd_client;						//fd_client as an int
+	char returnStr[BUFFERSIZE];				//used to store return codes
+	char* command = malloc(COMMLENGTH*sizeof(char));	//used to store commands
+	char* tokComm;						//used by strtok_r
+	char* token;						//used by strtok_r
+	char* pathname = malloc(COMMLENGTH*sizeof(char));	//used to store file pathname
+	int flags;						//used by OPEN
+	void* sentBuf;						//used by READ
+	unsigned long sentSize; 				//used by READ
+	unsigned long readSize;					//used for read ops
+	list* listOfFiles = NULL;				//used for victims/read (READN) files
+	elem* current;						//used to visit list
+	int N;							//used by READN
+	unsigned long writeSize;				//used for write ops
+	time_t currTime = time(NULL);				//used to calculate time in log
+	double now = 0;						//used to save time 
+	char* writeFileContent = NULL;				//used in write ops
+	char sizeStr[BUFFERSIZE];				//used to store file size
+	char* strtokState = NULL;				//used by strtok_r
+	int errCopy;						//used for saving errno
 	
-	//messages from clients are like "opcode arguments"
+	//messages from clients are formatted like "<opcode> <arguments>"
 	//strtok_r is used to retrieve the arguments
 	while(true){
 		fdString = NULL;
@@ -431,6 +437,7 @@ static void* workFunc(void* args){
 			break;
 		}
 		memset(command, 0, COMMLENGTH);
+		//if an error on readn occurs, close fd_client and disconnects it from server (sends -1 to manager)
 		if(readn(fd_client, (void*) command, COMMLENGTH) <= 0){
 			close(fd_client);
 			memset(pipeBuff, 0, BUFFERSIZE);
@@ -439,6 +446,7 @@ static void* workFunc(void* args){
 				exit(EXIT_FAILURE);
 			}		
 		}
+		//tokenize command
 		tokComm = command;
 		token = strtok_r(tokComm, " ", &strtokState);
 		if(token == NULL){
@@ -993,6 +1001,7 @@ static void* workFunc(void* args){
 				//CLOSECONN
 				case CLOSECONN:
 					close(fd_client);
+					//notify manager that a client left sending -1 on pipe
 					memset(pipeBuff, 0, BUFFERSIZE);
 					snprintf(pipeBuff, BUFFERSIZE, "%d", -1);
 					if(writen(pOut, (void*) pipeBuff, BUFFERSIZE) == -1){

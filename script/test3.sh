@@ -14,16 +14,16 @@ touch files1/6.txt
 touch files1/7.txt
 touch files1/8.txt
 touch files1/9.txt
-head -c 1MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold -w 50 > files1/1.txt
-head -c 5MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold -w 50 > files1/2.txt
-head -c 10MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold -w 50 > files1/3.txt
-head -c 15MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold -w 50 > files1/4.txt
-head -c 20MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold -w 50 > files1/5.txt
-head -c 25MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold -w 50 > files1/6.txt
-head -c 28MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold -w 50 > files1/7.txt
-head -c 29MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold -w 50 > files1/8.txt
-head -c 30MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold -w 50 > files1/9.txt
-head -c 31MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold -w 50 > files1/10.txt
+head -c 1MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold  > files1/1.txt
+head -c 5MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold  > files1/2.txt
+head -c 10MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold  > files1/3.txt
+head -c 15MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold  > files1/4.txt
+head -c 20MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold  > files1/5.txt
+head -c 25MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold  > files1/6.txt
+head -c 25MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold  > files1/7.txt
+head -c 30MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold  > files1/8.txt
+head -c 30MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold  > files1/9.txt
+head -c 30MB /dev/urandom | tr -dc 'a-zA-Z0-9~!@#$%^&*_-' | fold  > files1/10.txt
 cp -r files1 files2
 cp -r files1 files3
 cp -r files1 files4
@@ -99,7 +99,7 @@ done
 
 wait $SERVER_PID
 killall -q bin/client #if some clients are still running
-echo -e "\n[LRU] LRu test 3 completed"
+echo -e "\n[LRU] LRU test 3 completed"
 
 echo -e "\n== TEST 3 COMPLETED SUCCESSFULLY =="
 

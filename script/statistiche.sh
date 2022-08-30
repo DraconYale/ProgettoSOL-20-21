@@ -34,9 +34,9 @@ WRITEBYTES=$(grep "Write size:" $LOG_FILE | grep -oE '[^ ]+$' | sed 's/[^0-9]*//
 N_WRITES=$((N_WRITE+N_APPEND))
 
 echo -e "\nNumber of write operations: ${N_WRITES}"
-if [ ${N_READS} -gt 0 ]; then
+if [ ${N_WRITES} -gt 0 ]; then
 	AV_WROTEBYTES=$(echo "scale=3; ${WRITEBYTES} / ${N_WRITES}" | bc -l)
-	echo -e "Avarage read size: ${AV_WROTEBYTES} bytes."
+	echo -e "Avarage write size: ${AV_WROTEBYTES} bytes."
 fi
 
 echo -e "\n==Open/Lock/Unlock/Close operations=="
